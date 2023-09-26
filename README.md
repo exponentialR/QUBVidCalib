@@ -89,3 +89,9 @@ Feel free to fork this repository and submit a pull request if you have some fea
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE.md](./LICENSE.md) file for details.
+
+
+## TODO 
+> Update for Chess board use
+
+> Work on the Video Player
