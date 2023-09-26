@@ -16,7 +16,7 @@ calib_instance = None
 status_queue = queue.Queue()
 animated_text = ""
 animation_stop = False
-LOG_LEVELS = ['INFO', 'DEBUG', 'ERROR', 'WARNING', 'CORRECTED']
+LOG_LEVELS = ['INFO', 'DEBUG', 'ERROR', 'WARNING', 'CORRECTED', 'CC-done']
 
 
 def save_entries_to_config():
@@ -55,11 +55,6 @@ def load_entries_from_config():
         display_video_var.set(config['Parameters'].get('Display Video', ''))
 
 
-# # Function to switch to the parameter input frame and set the task_label
-# def show_frame(frame, text=None):
-#     if text:
-#         task_label.config(text=text)  # Set the task_label
-#     frame.tkraise()
 def show_frame(frame, text=None):
     if text:
         task_label.config(text=text)  # Set the task_label
@@ -89,7 +84,8 @@ def start_task():
         on_calibrate_click()
     elif task_label.cget("text") == "Correct Only":
         on_correct_only_click()
-    else:
+    elif task_label.cget('text') == 'Calibrate and Correct':
+        on_calibrate_correct_click()
         pass
 
 
@@ -112,6 +108,27 @@ def browse_video_files():
     video_files_var.set(';'.join(files_selected))
 
 
+def on_calibrate_correct_click():
+    show_frame(status_frame, "Calibrate and Correct")
+    global calib_instance
+    calib_instance = CalibrateCorrect(
+        proj_repo_var.get(),
+        project_name_var.get(),
+        video_files_var.get().split(';'),  # Assuming files are separated by semicolons
+        int(squaresX_var.get()),
+        int(squaresY_var.get()),
+        int(squareLength_var.get()),
+        int(markerLength_var.get()),
+        dictionary_var.get(),
+        int(frame_interval_calib_var.get()),
+        video_frame=video_display_frame,
+        save_every_n_frames=int(save_every_n_frames_var.get()),
+        display=str(display_video_var.get()),
+        status_queue=status_queue
+    )
+    threading.Thread(target=calib_instance.calibrate_correct).start()
+
+
 def on_calibrate_click():
     show_frame(status_frame, "Calibrate Only")
     global calib_instance
@@ -131,6 +148,19 @@ def on_calibrate_click():
         status_queue=status_queue
     )
     threading.Thread(target=calib_instance.calibrate_only).start()
+
+
+def on_correct_only_click():
+    global calib_instance
+    show_frame(status_frame, "Correct Only")
+    answer = messagebox.askyesno("Use own Calibration", "Would you like to use your own calibration files?")
+    if answer:
+        correct_only_popup_window()
+
+    else:
+        messagebox.showinfo('Notice', 'Saved settings and previously calculated calibration paramaters will be used ')
+        show_frame(input_frame, "Correct Only")
+        start_task_button.config(command=lambda: start_correct_only_task())
 
 
 def correct_only_popup_window():
@@ -188,19 +218,6 @@ def correct_only_popup_window():
     ttk.Button(popup, text="Done", command=on_done_click).grid(row=3, column=0, columnspan=2)
 
 
-def on_correct_only_click():
-    global calib_instance
-    show_frame(status_frame, "Correct Only")
-    answer = messagebox.askyesno("Use own Calibration", "Would you like to use your own calibration files?")
-    if answer:
-        correct_only_popup_window()
-
-    else:
-        messagebox.showinfo('Notice', 'Saved settings and previously calculated calibration paramaters will be used ')
-        show_frame(input_frame, "Correct Only")
-        start_task_button.config(command=lambda: start_correct_only_task())
-
-
 def start_correct_only_task():
     save_entries_to_config()
     global calib_instance
@@ -234,18 +251,12 @@ def pause_video():
         calib_instance.pause_video()
 
 
-# def seek_video(value):
-#     global calib_instance
-#     if calib_instance:
-#         calib_instance.seek_video(int(value))
-
-
 def update_gui():
     global status_queue
     try:
         while True:
             current_status, log_level = status_queue.get_nowait()
-            if log_level == "CORRECTED":
+            if log_level == "CORRECTED" or log_level == 'CC-done':
                 display_video_side_side = messagebox.askyesno("Display Corrected Video(s)",
                                                               "Would you like to display the corrected videos?")
                 if display_video_side_side:
@@ -269,11 +280,14 @@ def insert_status_text(text, log_level='INFO'):
     global animated_text_index, animation_stop
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+    current_scroll_position = status_text.yview()[1]
+
     if log_level in LOG_LEVELS:  # For non-empty log levels
-        full_text = f'[{timestamp}] [{log_level}] - {text}\n'
+        full_text = f'\n[{timestamp}] [{log_level}] - {text}\n'
         status_text.insert(tk.END, full_text, log_level)
     elif log_level == "-":
         full_text = f'{text}\n'
+        animation_stop = True
         status_text.insert(tk.END, full_text, log_level)
     else:  # For empty log level
         full_text = f'{text}\n'
@@ -283,16 +297,18 @@ def insert_status_text(text, log_level='INFO'):
         animation_stop = False  # Reset the stop flag
         start_animation(text)  # Start the animation
 
-    current_scroll_position = status_text.yview()[1]
-    if current_scroll_position == 1.0:
+    new_scroll_position = status_text.yview()[1]
+
+    # Only automatically scroll to the end if the user was already at the bottom
+    if current_scroll_position == 1.0 or new_scroll_position == 1.0:
         status_text.see(tk.END)
 
 
 def start_animation(initial_text):
     global animated_text_index, animation_stop
     if not animation_stop and animated_text_index:
-        num_dots = int(datetime.now().timestamp()) % 6
-        animated_text = f"{initial_text} {'|' * num_dots}"
+        num_dots = int(datetime.now().timestamp()) % 5
+        animated_text = f"{initial_text} {'|||' * num_dots}"
 
         # Update the text at the animated_text_index
         status_text.delete(animated_text_index, f"{animated_text_index} lineend")
@@ -309,7 +325,7 @@ def stop_animation():
 # Initialize the main window
 if __name__ == '__main__':
     root = tk.Tk()
-    root.geometry("750x750")
+    root.geometry("1080x920")
     root.title('Camera Calibration and Correction')
     root.configure(bg='blue')
 
@@ -362,10 +378,6 @@ if __name__ == '__main__':
     back_button = tk.Button(status_frame, text="Back", command=go_back)
     back_button.pack()
 
-    # Add this in your main code where you initialize your GUI
-
-    # video_slider.pack(side=tk.RIGHT, fill=tk.X, expand=1)
-
     # Styling the frames
     style = ttk.Style()
     label_style = {'bg': '#ADD8E6', 'fg': '#000000', 'font': ('Helvetica', 12)}
@@ -391,9 +403,9 @@ if __name__ == '__main__':
     )
 
     ttk.Button(start_frame, text="START CALIBRATION & CORRECTION",
-               command=lambda: show_frame(input_frame, "Calibrate & Correct")).grid(row=3, column=0, pady=10,
-                                                                                    sticky='w',
-                                                                                    padx=20)
+               command=lambda: show_frame(input_frame, "Calibrate and Correct")).grid(row=3, column=0, pady=10,
+                                                                                      sticky='w',
+                                                                                      padx=20)
 
     # Start Task button
     start_task_button = ttk.Button(input_frame, text="Start Task", command=start_task)
@@ -437,10 +449,8 @@ if __name__ == '__main__':
 
     display_video_frame_options = ['Yes', 'No']
     display_video_label_style = {'foreground': '#000000', 'font': ('Helvetica', 10)}
-    display_video_label = ttk.Label(input_frame, text="Display Video?:", **display_video_label_style)
+    display_video_label = ttk.Label(input_frame, text="Display Video during Calibration?:", **display_video_label_style)
     display_video_label.grid(row=len(params) + 2, column=0, sticky="w")
-    # ttk.Label(input_frame, text="Display video?:", **display_video_label_style).grid(row=len(params) + 2, column=0,
-    #                                                                                  sticky="w")
 
     display_video_menu = ttk.OptionMenu(input_frame, display_video_var, display_video_frame_options[0],
                                         *display_video_frame_options)
@@ -457,7 +467,7 @@ if __name__ == '__main__':
 
     scrollbar.config(command=status_text.yview)
 
-    status_text.tag_configure("INFO", foreground="black", font=('Cambria', 9, 'bold'))
+    status_text.tag_configure("INFO", foreground="black", font=('Cambria', 9,))
     status_text.tag_configure("DEBUG", foreground="blue", font=('Verdana', 9))
     status_text.tag_configure("", foreground="blue", font=('Verdana', 9))
     status_text.tag_configure("-", foreground="black", font=('Verdana', 9))
