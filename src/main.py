@@ -328,6 +328,22 @@ if __name__ == '__main__':
     root.geometry("1080x920")
     root.title('Camera Calibration and Correction')
     root.configure(bg='blue')
+    # Footer Frame
+    footer_frame = tk.Frame(root, bg='blue')  # Adjust the background color to match your theme
+    footer_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+    # Add a label for the copyright information, centered in the footer
+    copyright_label = tk.Label(footer_frame, text=f"(c) {datetime.now().year} Samuel Adebayo", bg='blue',
+                               fg='white')  # Adjust colors to match your theme
+    copyright_label.pack(side=tk.BOTTOM, anchor='s')
+    # Create a label for the 'Made with ❤️ @ Queen's University Belfast' text
+
+    # footer_frame = tk.Frame(root, bg='blue')  # Adjust the background color to match your theme
+    # footer_frame.pack(side=tk.BOTTOM, fill=tk.X)
+    #
+    # # Add a label to the footer frame with your custom text
+    # footnote_label = tk.Label(footer_frame, text="Made with ❤️ @ Queen's University Belfast\n(c) Samuel Adebayo", bg='blue', fg='white')  # Adjust colors to match your theme
+    # footnote_label.pack(side=tk.RIGHT)
 
     proj_repo_var = tk.StringVar()
     project_name_var = tk.StringVar()
@@ -368,6 +384,13 @@ if __name__ == '__main__':
 
     for frame in [start_frame, input_frame, status_frame]:
         frame.grid(row=0, column=0, sticky="nsew")
+    # Create a label for the 'Made with ❤️ @ Queen's University Belfast' text
+    # Create a label for the 'Made with ❤️ @ Queen's University Belfast' text
+    made_with_love_label = tk.Label(start_frame, text="Made with ❤️ @ Queen's University Belfast.", bg='#ADD8E6', fg='black')  # Adjust the background and foreground colors to match your theme
+    made_with_love_label.grid(row=4, column=0, pady=100, sticky='ew', columnspan=3)
+
+    # Configure the column to have weight 1, allowing it to expand and center the text
+    start_frame.grid_columnconfigure(0, weight=1)
 
     video_display_frame = Canvas(status_frame, bg='#ADD8E6', height=360, width=440)
     video_display_frame.pack(side="top", fill="none", expand=True, anchor='n', padx=40, pady=10)
