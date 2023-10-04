@@ -60,6 +60,7 @@ class CalibrateCorrect:
         self.play_video = True
         self.calibrate_correct_dict = {}
         self.video_index = 0
+        self.stop_requested = False
 
     def add_controls(self, control_frame):
         # Add Play Button
@@ -81,6 +82,8 @@ class CalibrateCorrect:
         self.play_video = False
 
     def display_corrected_video(self):
+        if self.stop_requested:
+            return
 
         if not self.play_video:
             self.video_frame.after(100, self.display_corrected_video)
@@ -147,6 +150,8 @@ class CalibrateCorrect:
                               (frame_width, frame_height))
         self.status_queue.put((f"Correcting {video_name}", ""))
         while True:
+            if self.stop_requested:
+                break
             ret, frame = cap.read()
             if not ret:
                 break
@@ -159,19 +164,30 @@ class CalibrateCorrect:
         out.release()
         return output_video_path
 
-    def correct_only(self, merged_calib_vid_dict):
+    def correct_only(self, merged_calib_vid_dict=None, sing_calib_file=None):
         total_videos = len(self.video_files)
-
-        if merged_calib_vid_dict is not None:
-            for idx, (video_file_path, calib_file_path) in enumerate(merged_calib_vid_dict.items()):
-                output_vid_path = self.process_video(video_file_path, calib_file_path)
-                self.correct_et_orig_dict[video_file_path] = output_vid_path
-        else:
+        if sing_calib_file is not None:
+            calib_file_path = sing_calib_file
             for idx, video_path in enumerate(self.video_files):
-                video_name = os.path.basename(video_path).split('.')[0]
-                calib_file_path = f'{self.param_folder}/{self.save_path_prefix}_{video_name}.npz'
+                if self.stop_requested:
+                    break
                 output_vid_path = self.process_video(video_path, calib_file_path)
                 self.correct_et_orig_dict[video_path] = output_vid_path
+        else:
+            if merged_calib_vid_dict is not None:
+                for idx, (video_file_path, calib_file_path) in enumerate(merged_calib_vid_dict.items()):
+                    if self.stop_requested:
+                        break
+                    output_vid_path = self.process_video(video_file_path, calib_file_path)
+                    self.correct_et_orig_dict[video_file_path] = output_vid_path
+            else:
+                for idx, video_path in enumerate(self.video_files):
+                    if self.stop_requested:
+                        break
+                    video_name = os.path.basename(video_path).split('.')[0]
+                    calib_file_path = f'{self.param_folder}/{self.save_path_prefix}_{video_name}.npz'
+                    output_vid_path = self.process_video(video_path, calib_file_path)
+                    self.correct_et_orig_dict[video_path] = output_vid_path
         # Initialize table header for status_queue
         table_header = "\n______________________________________________________________________________________________________________________\n"
         table_header += " Old Video Path                                 |    New Video Path                                                                     "
@@ -191,6 +207,8 @@ class CalibrateCorrect:
     def calibrate_only(self):
 
         for idx, video_path in enumerate(self.video_files):
+            if self.stop_requested:
+                break
             cap = None
             if cap is not None:
                 cap.release()
@@ -210,6 +228,8 @@ class CalibrateCorrect:
             all_charuco_corners = []
             all_charuco_ids = []
             while True:
+                if self.stop_requested:
+                    break
                 ret, frame = cap.read()
                 if not ret:
                     self.video_frame.delete("all")
@@ -264,9 +284,12 @@ class CalibrateCorrect:
                 if self.status_queue:
                     self.status_queue.put((f"Calibration done. File saved at {save_path}", "DEBUG"))
 
+
     def calibrate_correct(self):
         total_vids_len = len(self.video_files)
         for idx, video_path in enumerate(self.video_files):
+            if self.stop_requested:
+                break
             if self.status_queue:
                 self.status_queue.put((f'PROCESSING Videos {idx + 1} of {total_vids_len}', 'INFO'))
             cap = None
@@ -289,6 +312,8 @@ class CalibrateCorrect:
             if self.status_queue:
                 self.status_queue.put(("Collecting Corners and IDs for Calibration", ""))
             while True:
+                if self.stop_requested:
+                    break
                 ret, frame = cap.read()
                 if not ret:
                     self.video_frame.delete('all')
