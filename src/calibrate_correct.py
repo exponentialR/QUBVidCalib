@@ -60,7 +60,10 @@ class CalibrateCorrect:
         self.play_video = True
         self.calibrate_correct_dict = {}
         self.video_index = 0
-        self.stop_requested = False
+        self.stop_requested = None
+
+    def stop(self):
+        self.stop_requested = True
 
     def add_controls(self, control_frame):
         # Add Play Button
@@ -142,6 +145,8 @@ class CalibrateCorrect:
         video_name_ = os.path.basename(video_file_path).split('.')[0]
 
         cap = cv2.VideoCapture(video_file_path)
+        if self.stop_requested is not  None:
+            exit()
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
         fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -150,13 +155,15 @@ class CalibrateCorrect:
                               (frame_width, frame_height))
         self.status_queue.put((f"Correcting {video_name}", ""))
         while True:
-            if self.stop_requested:
-                break
             ret, frame = cap.read()
+            if self.stop_requested is not None:
+                break
             if not ret:
                 break
 
             corrected = cv2.undistort(frame, mtx, dist, None, mtx)
+            if self.stop_requested is not None:
+                break
 
             out.write(corrected)
 
@@ -169,20 +176,20 @@ class CalibrateCorrect:
         if sing_calib_file is not None:
             calib_file_path = sing_calib_file
             for idx, video_path in enumerate(self.video_files):
-                if self.stop_requested:
+                if self.stop_requested is not None:
                     break
                 output_vid_path = self.process_video(video_path, calib_file_path)
                 self.correct_et_orig_dict[video_path] = output_vid_path
         else:
             if merged_calib_vid_dict is not None:
                 for idx, (video_file_path, calib_file_path) in enumerate(merged_calib_vid_dict.items()):
-                    if self.stop_requested:
+                    if self.stop_requested is not None:
                         break
                     output_vid_path = self.process_video(video_file_path, calib_file_path)
                     self.correct_et_orig_dict[video_file_path] = output_vid_path
             else:
                 for idx, video_path in enumerate(self.video_files):
-                    if self.stop_requested:
+                    if self.stop_requested is not None:
                         break
                     video_name = os.path.basename(video_path).split('.')[0]
                     calib_file_path = f'{self.param_folder}/{self.save_path_prefix}_{video_name}.npz'
@@ -195,6 +202,8 @@ class CalibrateCorrect:
 
         self.status_queue.put((table_header, "-"))
         for old_video, corrected_vid in self.correct_et_orig_dict.items():
+            if self.stop_requested is not None:
+                break
             old_video_name = os.path.basename(old_video).split('.')[0]
             table_row = f"{old_video_name[:20]:<39} | {corrected_vid:<45}"
             self.status_queue.put((table_row, "-"))
@@ -207,7 +216,7 @@ class CalibrateCorrect:
     def calibrate_only(self):
 
         for idx, video_path in enumerate(self.video_files):
-            if self.stop_requested:
+            if self.stop_requested is not None:
                 break
             cap = None
             if cap is not None:
@@ -218,6 +227,8 @@ class CalibrateCorrect:
                 self.video_name = video_name
             save_path = f'{self.param_folder}/{self.save_path_prefix}_{video_name}.npz'
             cap = cv2.VideoCapture(video_path)
+            if self.stop_requested is not None:
+                break
             if not cap.isOpened():
                 self.status_queue.put((f'COULD NOT OPEN VIDEO FILE {video_path}. SKIPPING', 'WARNING'))
                 print(f"Warning: Couldn't open video file {video_path}. Skipping...")
@@ -228,9 +239,9 @@ class CalibrateCorrect:
             all_charuco_corners = []
             all_charuco_ids = []
             while True:
-                if self.stop_requested:
-                    break
                 ret, frame = cap.read()
+                if self.stop_requested is not None:
+                    break
                 if not ret:
                     self.video_frame.delete("all")
                     if self.status_queue:
@@ -283,7 +294,6 @@ class CalibrateCorrect:
                 np.savez(save_path, mtx=mtx, dist=dist)
                 if self.status_queue:
                     self.status_queue.put((f"Calibration done. File saved at {save_path}", "DEBUG"))
-
 
     def calibrate_correct(self):
         total_vids_len = len(self.video_files)
@@ -340,7 +350,8 @@ class CalibrateCorrect:
                             self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
                         if not ret or len(charuco_corners) <= self.min_corners:
                             if self.status_queue:
-                                self.status_queue.put(('Not enough corners for interpolation... Skipping Frame', 'INFO'))
+                                self.status_queue.put(
+                                    ('Not enough corners for interpolation... Skipping Frame', 'INFO'))
                             print(f'Not enough corners for interpolation')
                         else:
                             if self.status_queue:

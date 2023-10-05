@@ -222,15 +222,46 @@ class CalibrationApp:
     def open_web_page(self, event):
         webbrowser.open('http://github.com/exponentialR')
 
+    # def go_back(self):
+    #     if self.calib_instance:
+    #         self.calib_instance.stop_requested = True
+    #
+    #     if self.current_thread and self.current_thread.is_alive():
+    #         pass
+    #     self.calib_instance = None
+    #     self.current_thread = None
+    #     self.show_frame(self.start_frame)
     def go_back(self):
-        if self.calib_instance:
-            self.calib_instance.stop_requested = True
+        # Flag to stop the running task in CalibrateCorrect
+        # if self.calib_instance:
+        self.calib_instance.stop()
+        self.status_queue.queue.clear()
 
-        if self.current_thread and self.current_thread.is_alive():
-            pass
+
+        # Wait for the thread to stop (optional and should be used cautiously)
+        # if self.current_thread and self.current_thread.is_alive():
+        #     self.current_thread.join(timeout=1)  # Uncomment this only if it makes sense for your use case
+
+        # Nullify the instances
         self.calib_instance = None
         self.current_thread = None
+
+        # Stop any running animations
+        self.stop_animation()
+
+        # Clear the status queue to remove any lingering updates
+        while not self.status_queue.empty():
+            try:
+                self.status_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        # Show the starting frame again
         self.show_frame(self.start_frame)
+
+        # Optionally, display a user feedback message that the task has been stopped
+        messagebox.showinfo("Task Stopped", "The running task has been stopped.")
+
 
     def browse_proj_repo(self):
         folder_selected = filedialog.askdirectory()
