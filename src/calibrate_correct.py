@@ -97,7 +97,6 @@ class CalibrateCorrect:
                 return
             old_video, corrected_vid = list(self.correct_et_orig_dict.items())[self.video_index]
 
-            # old_video, corrected_vid = list(self.correct_et_orig_dict.items())[0]
             self.cap_orig = cv2.VideoCapture(old_video)
             self.cap_corrected = cv2.VideoCapture(corrected_vid)
 
@@ -111,6 +110,8 @@ class CalibrateCorrect:
             self.cap_corrected = None
             self.video_index += 1
             self.display_corrected_video()
+            self.stop_requested = True
+            self.stop()
             return
 
         # Resize for display if necessary
@@ -217,7 +218,7 @@ class CalibrateCorrect:
 
         for idx, video_path in enumerate(self.video_files):
             if self.stop_requested is not None:
-                break
+                return
             cap = None
             if cap is not None:
                 cap.release()
@@ -228,7 +229,8 @@ class CalibrateCorrect:
             save_path = f'{self.param_folder}/{self.save_path_prefix}_{video_name}.npz'
             cap = cv2.VideoCapture(video_path)
             if self.stop_requested is not None:
-                break
+                return
+
             if not cap.isOpened():
                 self.status_queue.put((f'COULD NOT OPEN VIDEO FILE {video_path}. SKIPPING', 'WARNING'))
                 print(f"Warning: Couldn't open video file {video_path}. Skipping...")

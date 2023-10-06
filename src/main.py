@@ -17,8 +17,7 @@ class CalibrationApp:
         self.root.title('Camera Calibration and Video Correction')
         self.root.configure(bg='blue')
         self.create_footer(root)
-        # self.footer_frame = tk.Frame(root, bg='green')
-        # self.footer_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
         self.calib_instance = None
         self.current_thread = None
 
@@ -199,7 +198,6 @@ class CalibrationApp:
         self.root.after(10, self.update_gui)
         self.root.mainloop()
 
-
     def create_footer(self, root):
         self.footer_frame = tk.Frame(root, bg='green')
         self.footer_frame.pack(side=tk.BOTTOM, fill=tk.X)
@@ -237,10 +235,9 @@ class CalibrationApp:
         self.calib_instance.stop()
         self.status_queue.queue.clear()
 
-
         # Wait for the thread to stop (optional and should be used cautiously)
-        # if self.current_thread and self.current_thread.is_alive():
-        #     self.current_thread.join(timeout=1)  # Uncomment this only if it makes sense for your use case
+        if self.current_thread and self.current_thread.is_alive():
+            self.current_thread.join(timeout=1)  # Uncomment this only if it makes sense for your use case
 
         # Nullify the instances
         self.calib_instance = None
@@ -261,7 +258,6 @@ class CalibrationApp:
 
         # Optionally, display a user feedback message that the task has been stopped
         messagebox.showinfo("Task Stopped", "The running task has been stopped.")
-
 
     def browse_proj_repo(self):
         folder_selected = filedialog.askdirectory()
@@ -433,7 +429,7 @@ class CalibrationApp:
             display=str(self.display_video_var.get()),
             status_queue=self.status_queue
         )
-        self.current_thread = threading.Thread(target=self.calib_instance.calibrate_correct)#.start()
+        self.current_thread = threading.Thread(target=self.calib_instance.calibrate_correct)  # .start()
         self.current_thread.start()
 
     def on_calibrate_click(self):
@@ -454,7 +450,7 @@ class CalibrationApp:
             display=str(self.display_video_var.get()),
             status_queue=self.status_queue
         )
-        self.current_thread=threading.Thread(target=self.calib_instance.calibrate_only)#.start()
+        self.current_thread = threading.Thread(target=self.calib_instance.calibrate_only)  # .start()
         self.current_thread.start()
 
     def on_correct_only_click(self):
@@ -518,7 +514,7 @@ class CalibrationApp:
                 status_queue=self.status_queue
             )
             self.current_thread = threading.Thread(target=self.calib_instance_correct_only.correct_only,
-                             args=(merged_dict))#.start()
+                                                   args=(merged_dict))  # .start()
             self.current_thread.start()
 
             popup.destroy()
@@ -542,8 +538,10 @@ class CalibrationApp:
 
         )
         self.show_frame(self.status_frame, "Correct Only")
-        self.current_thread = threading.Thread(target=self.calib_instance.correct_only, args=(None,))#.start()
+        self.current_thread = threading.Thread(target=self.calib_instance.correct_only, args=(None,))  # .start()
         self.current_thread.start()
 
 
-
+if __name__ == '__main__':
+    root = tk.Tk()
+    app = CalibrationApp(root)
