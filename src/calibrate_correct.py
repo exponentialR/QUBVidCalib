@@ -8,7 +8,14 @@ from PIL import Image, ImageTk
 from tkinter import Button, Label, Scale, HORIZONTAL
 from tkinter import Button, Scale, HORIZONTAL
 
-
+"""
+TODO: Calibrate and Correct code should be corrected
+    1. Pick Calibration file, then use it correct multiple videos.
+    2. 
+# TODO: Correct Only 
+    1. Pick a single calibration video, then use to correct multiple videos.
+    2. 
+  """
 def create_dir(direc):
     return os.makedirs(direc, exist_ok=True) if not os.path.exists(direc) else None
 
