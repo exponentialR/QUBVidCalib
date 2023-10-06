@@ -126,7 +126,7 @@ def on_calibrate_correct_click():
         display=str(display_video_var.get()),
         status_queue=status_queue
     )
-    threading.Thread(target=calib_instance.calibrate_correct).start()
+    threading.Thread(target=calib_instance.self_calibrate_correct).start()
 
 
 def on_calibrate_click():

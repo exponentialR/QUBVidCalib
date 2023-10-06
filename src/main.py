@@ -9,13 +9,14 @@ from datetime import datetime
 import webbrowser
 
 
+
 class CalibrationApp:
     def __init__(self, root):
         self.status_queue = queue.Queue()
         self.root = root
         self.root.geometry("1080x920")
         self.root.title('Camera Calibration and Video Correction')
-        self.root.configure(bg='blue')
+        self.root.configure(bg='black')
         self.create_footer(root)
 
         self.calib_instance = None
@@ -43,18 +44,21 @@ class CalibrationApp:
         self.save_every_n_frames_var = tk.StringVar()
         self.dictionary_var = tk.StringVar()
         self.display_video_var = tk.StringVar()
-
+        self.single_video_file_var = tk.StringVar()
         self.params = [
             ("Project Repository:", self.proj_repo_var, self.browse_proj_repo, None),
             ("Project Name:", self.project_name_var, None, None),
-            ("Video Files:", self.video_files_var, self.browse_video_files, None),
+            # ("Calibration Video:", self.single_video_file_var, self.browse_single_video_file, None),
+            ("Video Files (for correction):", self.video_files_var, self.browse_video_files, None),
             ("SquaresX:", self.squaresX_var, None, None),
             ("SquaresY:", self.squaresY_var, None, None),
             ("SquareLength:", self.squareLength_var, None, None),
             ("MarkerLength:", self.markerLength_var, None, None),
             ("Frame Interval:", self.frame_interval_calib_var, None, None),
-            ("Save Every N Frames:", self.save_every_n_frames_var, None, None)
+            ("Save Every N Frames:", self.save_every_n_frames_var, None, None),
+
         ]
+
 
         # Initialize frames
         self.container = tk.Frame(self.root)
@@ -73,7 +77,7 @@ class CalibrationApp:
         self.made_with_love_label = tk.Label(self.start_frame, text="Made with ❤️ @ Queen's University Belfast.",
                                              bg='#ADD8E6',
                                              fg='black')  # Adjust the background and foreground colors to match your theme
-        self.made_with_love_label.grid(row=4, column=0, pady=100, sticky='ew', columnspan=3)
+        self.made_with_love_label.grid(row=1000, column=0, pady=100, padx=20, sticky='ew', columnspan=50)
 
         self.start_frame.grid_columnconfigure(0, weight=1)
 
@@ -83,12 +87,13 @@ class CalibrationApp:
         self.animated_text_label = tk.Label(self.status_frame, bg='#ADD8E6', fg='#000000')
         self.animated_text_label.pack()
 
-        self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
-        self.back_button.pack()
+
+        # self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
+        # self.back_button.pack()
 
         # Styling the frames
         self.style = ttk.Style()
-        self.label_style = {'bg': '#ADD8E6', 'fg': '#000000', 'font': ('Helvetica', 12)}
+        self.label_style = {'bg': '#ADD8E6', 'fg': '#000000', 'font': ('Courier New', 12)}
         self.style.configure('My.TFrame', background='#ADD8E6')  # Light blue background
         self.welcome_frame = tk.Frame(self.start_frame, bg='#ADD8E6')
 
@@ -96,27 +101,40 @@ class CalibrationApp:
         # Create the Label first
         self.welcome_label = tk.Label(self.welcome_frame, text="Welcome to Camera Calibration and Correction",
                                       **self.label_style)
-        self.welcome_label.config(font=('Helvetica', 24))
+        self.welcome_label.config(font=('Courier New', 30, 'bold'))
         self.welcome_label.grid(row=0, column=0)
 
-        self.welcome_frame.grid_columnconfigure(0, weight=1)
+        self.welcome_frame.grid_columnconfigure(0, weight=2)
+        self.single_video_label = tk.Label(self.input_frame, text="Single Video File:", **self.label_style)
+        # self.single_video_label.grid(row=len(self.params) + 5, column=0, sticky="w")  # Adjust row as needed
+
+        self.single_video_entry = ttk.Entry(self.input_frame, textvariable=self.single_video_file_var, width=40)
+        # self.single_video_entry.grid(row=len(self.params) + 5, column=1)  # Adjust row as needed
+
+        self.single_video_button = ttk.Button(self.input_frame, text="Browse", command=self.browse_single_video_file)
+        # self.single_video_button.grid(row=len(self.params) + 5, column=2)  # Adjust row as needed
         # Create buttons
-        ttk.Button(self.start_frame, text=" START CALIBRATION",
+        ttk.Button(self.start_frame, text='CALIBRATE AND CORRECT', command=lambda: self.show_frame(self.input_frame,
+                                                                                                   'Single Calib and Multiple Video Correction')).grid(
+            row=1, column=0, pady=10, sticky='ew', padx=20)
+        ttk.Button(self.start_frame, text="CALIBRATION ONLY",
                    command=lambda: self.show_frame(self.input_frame, "Calibrate Only")).grid(
-            row=1, column=0, pady=10, sticky='w', padx=20)
-        ttk.Button(self.start_frame, text=" START CORRECTION", command=self.on_correct_only_click).grid(
-            row=2,
+            row=2, column=0, pady=10, sticky='ew', padx=20)
+        ttk.Button(self.start_frame, text="CORRECTION ONLY", command=self.on_correct_only_click).grid(
+            row=3,
             column=0,
             pady=10,
-            sticky='w',
+            sticky='ew',
             padx=20
         )
+        ttk.Separator(self.start_frame, orient='horizontal').grid(row=4, column=0, sticky='ew', padx=20)
+        tk.Label(self.start_frame, text="Others", bg='#ADD8E6').grid(row=5, column=0, sticky='w', padx=20)
 
-        ttk.Button(self.start_frame, text="START CALIBRATION & CORRECTION",
-                   command=lambda: self.show_frame(self.input_frame, "Calibrate and Correct")).grid(row=3, column=0,
-                                                                                                    pady=10,
-                                                                                                    sticky='w',
-                                                                                                    padx=20)
+        ttk.Button(self.start_frame, text="START SELF-CALIBRATION & CORRECTION",
+                   command=lambda: self.show_frame(self.input_frame, "Self-Calibrate & Correct")).grid(row=8, column=0,
+                                                                                                       pady=10,
+                                                                                                       sticky='ew',
+                                                                                                       padx=20)
 
         # Start Task button
         self.start_task_button = ttk.Button(self.input_frame, text="Start Task", command=self.start_task)
@@ -125,8 +143,9 @@ class CalibrationApp:
             row=len(self.params) + 4,
             column=1,
             padx=5, pady=5)
-        self.task_label = tk.Label(self.input_frame, text="", font=("Helvetica", 18), bg='#ADD8E6', fg='#000000')
+        self.task_label = tk.Label(self.input_frame, text="", font=("Verdana", 18, 'bold'), bg='#ADD8E6', fg='#000000')
         self.task_label.grid(row=0, column=0, columnspan=3, pady=20, sticky="ew")
+        n_rows = len(self.params)
 
         for i, (text, var, cmd, _) in enumerate(self.params):
             label = tk.Label(self.input_frame, text=text, **self.label_style)
@@ -144,6 +163,9 @@ class CalibrationApp:
 
             # Store the reference back into params
             self.params[i] = (text, var, cmd, label)
+        # self.single_video_label.grid(row=n_rows + 1, column=0, sticky="w")  # Adjust row as needed
+        # self.single_video_entry.grid(row=n_rows + 1, column=1)  # Adjust row as needed
+        # self.single_video_button.grid(row=n_rows + 1, column=2)  # Adjust row as needed
         self.dictionary_options = [
             'DICT_4X4_50', 'DICT_4X4_100', 'DICT_4X4_250', 'DICT_4X4_1000', 'DICT_5X5_50',
             'DICT_5X5_100', 'DICT_5X5_250', 'DICT_5X5_1000',
@@ -173,6 +195,11 @@ class CalibrationApp:
                                                  *self.display_video_frame_options)
         self.display_video_menu.grid(row=len(self.params) + 2, column=1)
 
+
+        self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
+        self.back_button.pack()
+
+
         self.status_text_frame = tk.Frame(self.status_frame)
         self.status_text_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
@@ -198,6 +225,17 @@ class CalibrationApp:
         self.root.after(10, self.update_gui)
         self.root.mainloop()
 
+    def browse_single_video_file(self):
+        single_video_file = filedialog.askopenfilename(
+            filetypes=[
+                (
+                    "Video files",
+                    "*.mp4 *.MP4 *.avi *.AVI *.mov *.MOV *.flv *.FLV *.mkv *.MKV *.wmv *.WMV *.webm *.WEBM"),
+                ("All files", "*.*")
+            ]
+        )
+        self.single_video_file_var.set(single_video_file)
+
     def create_footer(self, root):
         self.footer_frame = tk.Frame(root, bg='green')
         self.footer_frame.pack(side=tk.BOTTOM, fill=tk.X)
@@ -220,15 +258,6 @@ class CalibrationApp:
     def open_web_page(self, event):
         webbrowser.open('http://github.com/exponentialR')
 
-    # def go_back(self):
-    #     if self.calib_instance:
-    #         self.calib_instance.stop_requested = True
-    #
-    #     if self.current_thread and self.current_thread.is_alive():
-    #         pass
-    #     self.calib_instance = None
-    #     self.current_thread = None
-    #     self.show_frame(self.start_frame)
     def go_back(self):
         # Flag to stop the running task in CalibrateCorrect
         # if self.calib_instance:
@@ -308,6 +337,15 @@ class CalibrationApp:
             self.dictionary_var.set(config['Parameters'].get('Dictionary', ''))
             self.display_video_var.set(config['Parameters'].get('Display Video', ''))
 
+
+    def shift_down_widgets(self, start_row, shift_amount):
+        for child in self.input_frame.winfo_children():
+            info = child.grid_info()
+            if info:
+                current_row = int(info['row'])
+                if current_row >= start_row:
+                    child.grid(row=current_row + shift_amount)
+
     def show_frame(self, frame, text=None):
         if text:
             self.task_label.config(text=text)  # Set the task_label
@@ -319,6 +357,15 @@ class CalibrationApp:
             self.save_every_n_frames_entry.grid_remove()
             self.display_video_label.grid_remove()
             self.display_video_menu.grid_remove()
+            self.single_video_label.grid_remove()
+            self.single_video_entry.grid_remove()
+            self.single_video_button.grid_remove()
+        elif text == 'Single Calib and Multiple Video Correction':
+            self.shift_down_widgets(start_row=4, shift_amount=1)
+            self.single_video_label.grid(row=4, column=0, sticky="w")
+            self.single_video_entry.grid(row=4, column=1)
+            self.single_video_button.grid(row=4, column=2)
+
         else:
             for _, _, _, label in self.params:
                 if label and label.cget("text") in ["Frame Interval:", "Save Every N Frames:"]:
@@ -327,6 +374,9 @@ class CalibrationApp:
             self.save_every_n_frames_entry.grid()
             self.display_video_label.grid()
             self.display_video_menu.grid()
+            self.single_video_label.grid_remove()
+            self.single_video_entry.grid_remove()
+            self.single_video_button.grid_remove()
         frame.tkraise()
 
     def start_task(self):
@@ -336,9 +386,11 @@ class CalibrationApp:
             self.on_calibrate_click()
         elif self.task_label.cget("text") == "Correct Only":
             self.on_correct_only_click()
-        elif self.task_label.cget('text') == 'Calibrate and Correct':
+        elif self.task_label.cget('text') == 'Self-Calibrate & Correct':
+            self.on_self_calibrate_correct_click()
+        elif self.task_label.cget("text") == 'Single Calib and Multiple Video Correction':
             self.on_calibrate_correct_click()
-            pass
+        pass
 
     def play_video(self):
         if self.calib_instance is not None:
@@ -412,8 +464,8 @@ class CalibrationApp:
             pass
         self.root.after(10, self.update_gui)
 
-    def on_calibrate_correct_click(self):
-        self.show_frame(self.status_frame, "Calibrate and Correct")
+    def on_self_calibrate_correct_click(self):
+        self.show_frame(self.status_frame, "Self-Calibrate & Correct")
         self.calib_instance = CalibrateCorrect(
             self.proj_repo_var.get(),
             self.project_name_var.get(),
@@ -429,7 +481,28 @@ class CalibrationApp:
             display=str(self.display_video_var.get()),
             status_queue=self.status_queue
         )
-        self.current_thread = threading.Thread(target=self.calib_instance.calibrate_correct)  # .start()
+        self.current_thread = threading.Thread(target=self.calib_instance.self_calibrate_correct)  # .start()
+        self.current_thread.start()
+
+    def on_calibrate_correct_click(self):
+        self.show_frame(self.start_frame, 'Single Calib and Multiple Video Correction')
+        self.calib_instance = CalibrateCorrect(
+            self.proj_repo_var.get(),
+            self.project_name_var.get(),
+            self.video_files_var.get().split(';'),  # Assuming files are separated by semicolons
+            int(self.squaresX_var.get()),
+            int(self.squaresY_var.get()),
+            int(self.squareLength_var.get()),
+            int(self.markerLength_var.get()),
+            self.dictionary_var.get(),
+            int(self.frame_interval_calib_var.get()),
+            video_frame=self.video_display_frame,
+            save_every_n_frames=int(self.save_every_n_frames_var.get()),
+            display=str(self.display_video_var.get()),
+            status_queue=self.status_queue
+        )
+        self.current_thread = threading.Thread(target=self.calib_instance.singleCalibMultiCorrect,
+                                               args=(self.single_video_file_var.get(),))
         self.current_thread.start()
 
     def on_calibrate_click(self):
