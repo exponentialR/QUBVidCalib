@@ -1,4 +1,5 @@
 import tkinter as tk
+import uuid
 from tkinter import ttk, filedialog, simpledialog, messagebox
 from calibrate_correct import CalibrateCorrect
 import configparser
@@ -7,11 +8,16 @@ import threading
 import queue
 from datetime import datetime
 import webbrowser
+# from utils import SharedState
+import os
 
+
+# TODO : Add the play/Pause and slider button to the
 
 
 class CalibrationApp:
     def __init__(self, root):
+        self.animated_text_index = None
         self.status_queue = queue.Queue()
         self.root = root
         self.root.geometry("1080x920")
@@ -31,6 +37,12 @@ class CalibrationApp:
         self.frame_interval_entry = None
         self.save_every_n_frames_entry = None
         # self.calib_instance = None
+
+        # self.tree = ttk.Treeview(self.status_frame, columns=("Old Video", "Calibration File", "New Video"))
+        # self.tree.heading("#1", text="Old Video")
+        # self.tree.heading("#2", text="Calibration File")
+        # self.tree.heading("#3", text="New Video")
+        # self.tree.pack(side="bottom", fill="both", expand=True)
 
         # Initialize variables
         self.proj_repo_var = tk.StringVar()
@@ -87,10 +99,6 @@ class CalibrationApp:
         self.animated_text_label = tk.Label(self.status_frame, bg='#ADD8E6', fg='#000000')
         self.animated_text_label.pack()
 
-
-        # self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
-        # self.back_button.pack()
-
         # Styling the frames
         self.style = ttk.Style()
         self.label_style = {'bg': '#ADD8E6', 'fg': '#000000', 'font': ('Courier New', 12)}
@@ -106,13 +114,11 @@ class CalibrationApp:
 
         self.welcome_frame.grid_columnconfigure(0, weight=2)
         self.single_video_label = tk.Label(self.input_frame, text="Single Video File:", **self.label_style)
-        # self.single_video_label.grid(row=len(self.params) + 5, column=0, sticky="w")  # Adjust row as needed
 
         self.single_video_entry = ttk.Entry(self.input_frame, textvariable=self.single_video_file_var, width=40)
-        # self.single_video_entry.grid(row=len(self.params) + 5, column=1)  # Adjust row as needed
 
         self.single_video_button = ttk.Button(self.input_frame, text="Browse", command=self.browse_single_video_file)
-        # self.single_video_button.grid(row=len(self.params) + 5, column=2)  # Adjust row as needed
+
         # Create buttons
         ttk.Button(self.start_frame, text='CALIBRATE AND CORRECT', command=lambda: self.show_frame(self.input_frame,
                                                                                                    'Single Calib and Multiple Video Correction')).grid(
@@ -163,9 +169,7 @@ class CalibrationApp:
 
             # Store the reference back into params
             self.params[i] = (text, var, cmd, label)
-        # self.single_video_label.grid(row=n_rows + 1, column=0, sticky="w")  # Adjust row as needed
-        # self.single_video_entry.grid(row=n_rows + 1, column=1)  # Adjust row as needed
-        # self.single_video_button.grid(row=n_rows + 1, column=2)  # Adjust row as needed
+
         self.dictionary_options = [
             'DICT_4X4_50', 'DICT_4X4_100', 'DICT_4X4_250', 'DICT_4X4_1000', 'DICT_5X5_50',
             'DICT_5X5_100', 'DICT_5X5_250', 'DICT_5X5_1000',
@@ -194,7 +198,15 @@ class CalibrationApp:
                                                  self.display_video_frame_options[0],
                                                  *self.display_video_frame_options)
         self.display_video_menu.grid(row=len(self.params) + 2, column=1)
-
+        self.animation_active = False
+        self.animated_text_label = tk.Label(self.status_frame, bg='#ADD8E6', fg='#000000')
+        self.animated_text_label.pack()
+        self.current_animation_id = None
+        self.tree = ttk.Treeview(self.status_frame, columns=("Old Video", "Calibration File", "New Video"))
+        self.tree.heading("#1", text="Old Video")
+        self.tree.heading("#2", text="Calibration File")
+        self.tree.heading("#3", text="New Video")
+        self.tree.pack(side="bottom", fill="both", expand=True)
 
         self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
         self.back_button.pack()
@@ -221,6 +233,8 @@ class CalibrationApp:
         self.status_text.tag_configure("CORRECTED", foreground="red")
 
         self.show_frame(self.start_frame)
+        self.tree.pack(side="bottom", fill="both", expand=True)
+
         self.load_entries_from_config()
         self.root.after(10, self.update_gui)
         self.root.mainloop()
@@ -259,14 +273,13 @@ class CalibrationApp:
         webbrowser.open('http://github.com/exponentialR')
 
     def go_back(self):
-        # Flag to stop the running task in CalibrateCorrect
-        # if self.calib_instance:
+
         self.calib_instance.stop()
         self.status_queue.queue.clear()
 
         # Wait for the thread to stop (optional and should be used cautiously)
         if self.current_thread and self.current_thread.is_alive():
-            self.current_thread.join(timeout=1)  # Uncomment this only if it makes sense for your use case
+            self.current_thread.join(timeout=1)
 
         # Nullify the instances
         self.calib_instance = None
@@ -308,6 +321,7 @@ class CalibrationApp:
         config['Parameters'] = {
             'Project Repository': self.proj_repo_var.get(),
             'Project Name': self.project_name_var.get(),
+            'Single Video Calib': self.single_video_file_var.get(),
             'Video Files': self.video_files_var.get(),
             'SquareX': self.squaresX_var.get(),
             'SquareY': self.squaresY_var.get(),
@@ -327,6 +341,7 @@ class CalibrationApp:
         if 'Parameters' in config:
             self.proj_repo_var.set(config['Parameters'].get('Project Repository', ''))
             self.project_name_var.set(config['Parameters'].get('Project Name', ''))
+            self.single_video_file_var.set(config['Parameters'].get('Single Video Calib', ''))
             self.video_files_var.set(config['Parameters'].get('Video Files', ''))
             self.squaresX_var.set(config['Parameters'].get('SquareX', ''))
             self.squaresY_var.set(config['Parameters'].get('SquareY', ''))
@@ -390,7 +405,7 @@ class CalibrationApp:
             self.on_self_calibrate_correct_click()
         elif self.task_label.cget("text") == 'Single Calib and Multiple Video Correction':
             self.on_calibrate_correct_click()
-        pass
+            pass
 
     def play_video(self):
         if self.calib_instance is not None:
@@ -408,17 +423,25 @@ class CalibrationApp:
         if log_level in self.LOG_LEVELS:  # For non-empty log levels
             full_text = f'\n[{timestamp}] [{log_level}] - {text}\n'
             self.status_text.insert(tk.END, full_text, log_level)
-        elif log_level == "-":
+        elif log_level == "-" or log_level in self.LOG_LEVELS:
             full_text = f'{text}\n'
+            self.stop_animation()
             self.animation_stop = True
             self.status_text.insert(tk.END, full_text, log_level)
-        else:  # For empty log level
+        elif log_level == 'anime':
+            if self.animated_text_index is not None:
+                self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
             full_text = f'{text}\n'
             self.status_text.insert(tk.END, full_text)
+
             self.animated_text_index = self.status_text.index(tk.END)  # Store the index of the animated text
             self.animated_text_index = f"{float(self.animated_text_index) - 1.0} linestart"  # Go to the beginning of the line
             self.animation_stop = False  # Reset the stop flag
             self.start_animation(text)  # Start the animation
+        elif log_level == 'stop-anime':
+            self.animation_stop = True
+        else:  # For empty log level
+            pass
 
         new_scroll_position = self.status_text.yview()[1]
 
@@ -427,18 +450,32 @@ class CalibrationApp:
             self.status_text.see(tk.END)
 
     def start_animation(self, initial_text):
-        if not self.animation_stop and self.animated_text_index:
-            num_dots = int(datetime.now().timestamp()) % 5
-            animated_text = f"{initial_text} {'|||' * num_dots}"
+        if not self.animation_stop and self.animated_text_index and not self.animation_active:
+            new_animation_id = uuid.uuid4()
+            self.current_animation_id = new_animation_id
+            self._start_animation_helper(initial_text, new_animation_id)
+            # num_dots = int(datetime.now().timestamp()) % 5
+            # animated_text = f"{initial_text} {'|||' * num_dots}"
+            #
+            # # Update the text at the animated_text_index
+            # self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
+            # self.status_text.insert(self.animated_text_index, animated_text)
+            #
+            # self.root.after(500, lambda: self.start_animation(initial_text))
 
-            # Update the text at the animated_text_index
+    def _start_animation_helper(self, initial_text, animation_id):
+        if self.current_animation_id == animation_id:
+            num_dots = int(datetime.now().timestamp()) % 5
+            animated_text = f"{initial_text} {'|||' *num_dots}"
             self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
             self.status_text.insert(self.animated_text_index, animated_text)
 
-            self.root.after(500, lambda: self.start_animation(initial_text))
+            self.root.after(500, lambda: self._start_animation_helper(initial_text, animation_id))
+
 
     def stop_animation(self):
         self.animation_stop = True
+        self.current_animation_id = None
 
     def update_gui(self):
         try:
@@ -448,18 +485,21 @@ class CalibrationApp:
                     display_video_side_side = messagebox.askyesno("Display Corrected Video(s)",
                                                                   "Would you like to display the corrected videos?")
                     if display_video_side_side and self.calib_instance:
-                        play_button = tk.Button(self.control_frame, text="Play", command=self.calib_instance.play_video)
-                        pause_button = tk.Button(self.control_frame, text="Pause", command=self.calib_instance.pause)
-                        # video_slider = tk.Scale(control_frame, from_=0, to=100, orient=tk.HORIZONTAL, command=calib_instance.seek_video)
-
-                        play_button.pack(side=tk.LEFT)
-                        pause_button.pack(side=tk.LEFT)
-
-                        self.calib_instance.add_controls(self.control_frame)
                         self.calib_instance.display_corrected_video()
                 elif log_level == "-" or log_level in self.LOG_LEVELS:
+                    self.animation_active = False
                     self.stop_animation()
+                elif log_level == "update-treeview":
+                    for item in self.tree.get_children():
+                        self.tree.delete(item)
+                    print(f'CURRENT STATUS: {current_status}')
+                    for old_video, corrected_vid_details in current_status.items():
+                        old_video_name = os.path.basename(old_video).split('.')[0]
+                        calib_file, new_video = corrected_vid_details[0], corrected_vid_details[1]
+                        self.tree.insert("", tk.END, values=(old_video_name, calib_file, new_video))
+
                 self.insert_status_text(current_status, log_level)
+
         except queue.Empty:
             pass
         self.root.after(10, self.update_gui)
@@ -485,7 +525,7 @@ class CalibrationApp:
         self.current_thread.start()
 
     def on_calibrate_correct_click(self):
-        self.show_frame(self.start_frame, 'Single Calib and Multiple Video Correction')
+        self.show_frame(self.status_frame, 'Single Calib and Multiple Video Correction')
         self.calib_instance = CalibrateCorrect(
             self.proj_repo_var.get(),
             self.project_name_var.get(),
