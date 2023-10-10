@@ -8,6 +8,7 @@ from PIL import Image, ImageTk
 from tkinter import Button, Label, Scale, HORIZONTAL
 from tkinter import Button, Scale, HORIZONTAL
 
+# from utils import SharedState
 """
 TODO: Calibrate and Correct code should be corrected
     1. Pick Calibration file, then use it correct multiple videos.
@@ -41,12 +42,13 @@ class CalibrateCorrect:
     def __init__(self, proj_repo, projectname, video_files, squaresX, squaresY, squareLength, markerLength,
                  dictionary, frame_interval_calib=None, display=None, video_frame=None, save_every_n_frames=None,
                  status_queue=None):
-
+        self.animation_active = False
         self.pause_button = None
         self.play_button = None
         self.projectname = os.path.join(proj_repo, projectname)
         create_dir(self.projectname)
         self.param_folder = f'{self.projectname}/CalibrationFiles'
+        self.rejected_frames_dir = f'{self.projectname}/RejectedFrames'
         create_dir(self.param_folder)
         self.corrected_video_folder = f'{self.projectname}/CorrectedVideos'
         create_dir(self.corrected_video_folder)
@@ -69,6 +71,10 @@ class CalibrateCorrect:
         self.calibration_params = None  # To store calibration parameters
         self.current_progress = 0  # To store the current progress percentage
         self.video_frame = video_frame
+        self.is_playing = True
+        self.current_frame_number = 0
+        self.display_video_dict = {}
+
         self.status_queue = status_queue
         self.video_name = None
         self.correct_et_orig_dict = {}
@@ -111,10 +117,9 @@ class CalibrateCorrect:
             return
 
         if self.cap_orig is None or self.cap_corrected is None:
-            if self.video_index >= len(self.correct_et_orig_dict):
+            if self.video_index >= len(self.display_video_dict):
                 return
-            old_video, corrected_vid = list(self.correct_et_orig_dict.items())[self.video_index]
-
+            old_video, corrected_vid = list(self.display_video_dict.items())[self.video_index]
             self.cap_orig = cv2.VideoCapture(old_video)
             self.cap_corrected = cv2.VideoCapture(corrected_vid)
 
@@ -127,6 +132,7 @@ class CalibrateCorrect:
             self.cap_orig = None
             self.cap_corrected = None
             self.video_index += 1
+            self.video_frame.delete('all')
             self.display_corrected_video()
             self.stop_requested = True
             self.stop()
@@ -147,7 +153,7 @@ class CalibrateCorrect:
 
         self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
         current_frame_number = int(self.cap_orig.get(cv2.CAP_PROP_POS_FRAMES))
-        self.slider.set(current_frame_number)
+        # self.slider.set(current_frame_number)
 
         # Schedule the next frame
         self.video_frame.after(10, self.display_corrected_video)
@@ -172,7 +178,7 @@ class CalibrateCorrect:
         output_video_path = f'{self.corrected_video_folder}/{video_name_}.MP4'
         out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps,
                               (frame_width, frame_height))
-        self.status_queue.put((f"Correcting {video_name}", ""))
+        self.status_queue.put((f"Correcting {video_name}", "anime"))
         while True:
             ret, frame = cap.read()
             if self.stop_requested is not None:
@@ -231,6 +237,7 @@ class CalibrateCorrect:
                     "-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------",
                     "-"))
         self.status_queue.put(('', "CORRECTED"))
+        self.correct_et_orig_dict.clear()
 
     def calibrate_only(self):
 
@@ -288,8 +295,9 @@ class CalibrateCorrect:
                             self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
                         if not ret or len(charuco_corners) <= self.min_corners:
                             if self.status_queue:
-                                self.status_queue.put(('Not enough corners for interpolation', 'INFO'))
-                            print(f'Not enough corners for interpolation')
+                                self.status_queue.put(
+                                    (f'Frame {frame_count} - Not enough corners for interpolation', 'INFO'))
+                            # print(f'Not enough corners for interpolation')
                         else:
                             all_charuco_corners.append(charuco_corners)
                             all_charuco_ids.append(charuco_ids)
@@ -304,7 +312,9 @@ class CalibrateCorrect:
 
             # Perform camera calibration
             if self.status_queue:
-                self.status_queue.put(("Computing Calibration", ""))
+                # self.status_queue.put(("Computing Calibration", ""))
+                self.status_queue.put(("Computing Calibration", "anime"))
+
             if len(all_charuco_corners) > 0 and len(all_charuco_ids) > 0:
                 ret, mtx, dist, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(all_charuco_corners,
                                                                                 all_charuco_ids,
@@ -316,136 +326,49 @@ class CalibrateCorrect:
                     self.status_queue.put((f"Calibration done. File saved at {save_path}", "DEBUG"))
 
     def self_calibrate_correct(self):
-
         total_vids_len = len(self.video_files)
         for idx, video_path in enumerate(self.video_files):
             if self.stop_requested:
                 break
             if self.status_queue:
                 self.status_queue.put((f'PROCESSING Videos {idx + 1} of {total_vids_len}', 'INFO'))
-            cap = None
-            if cap is not None:
-                cap.release()
-            video_name = os.path.basename(video_path).split('.')[0]
-            if self.video_name is None:
-                self.video_name = video_name
-            save_path = f'{self.param_folder}/{self.save_path_prefix}_{video_name}.npz'
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                self.status_queue.put((f' COULD NOT OPEN VIDEO FILE {video_path}. SKIPPING', 'WARNING'))
+            save_path = self.calibrate_single_video(video_path)
+            if save_path is None:
+                self.status_queue.put((f'CALIBRATION FAILED FOR {video_path}', 'ERROR'))
                 continue
+            output_vid_path = self.process_video(video_path, save_path)
+            self.correct_et_orig_dict[video_path] = output_vid_path
+            save_path_ = sep_direc_files(save_path)
+            output_vid_path_ = sep_direc_files(output_vid_path)
+            self.calibrate_correct_dict[video_path] = [save_path_, output_vid_path_]
 
-            frame_count = 0
-            gray = None
-            all_charuco_corners = []
-            all_charuco_ids = []
-
-            if self.status_queue:
-                self.status_queue.put(("Collecting Corners and IDs for Calibration", ""))
-            while True:
-                if self.stop_requested:
-                    break
-                ret, frame = cap.read()
-                if not ret:
-                    self.video_frame.delete('all')
-                    if self.status_queue:
-                        self.status_queue.put((f' DONE PROCESSING VIDEO: {video_name}', 'DEBUG'))
-
-                    break
-
-                if frame_count % self.frame_interval_calib == 0:
-                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    corners, ids, _ = cv2.aruco.detectMarkers(gray, self.aruco_dict)
-
-                    if len(corners) > 0:
-                        debug_frame = cv2.aruco.drawDetectedMarkers(frame.copy(), corners, ids)
-                        ret, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(corners, ids, gray,
-                                                                                                self.board,
-                                                                                                charucoIds=ids)
-
-                        if self.display == 'Yes':
-                            debug_frame_ = cv2.resize(debug_frame, (440, 360))
-                            self.video_frame.img = ImageTk.PhotoImage(
-                                image=Image.fromarray(cv2.cvtColor(debug_frame_, cv2.COLOR_BGR2RGB)))
-                            self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
-                        if not ret or len(charuco_corners) <= self.min_corners:
-                            if self.status_queue:
-                                self.status_queue.put(
-                                    ('Not enough corners for interpolation... Skipping Frame', 'INFO'))
-                            print(f'Not enough corners for interpolation')
-                        else:
-                            if self.status_queue:
-                                self.status_queue.put(("Collecting Corners and IDs for Calibration", "INFO"))
-                            all_charuco_corners.append(charuco_corners)
-                            all_charuco_ids.append(charuco_ids)
-
-                            # Save the frame used for calibration
-                            if self.save_calib_frames is not None and frame_count % self.save_calib_frames == 0:
-                                frame_filename = os.path.join(self.calib_frames, video_name,
-                                                              f'{video_name}_{frame_count}.png')
-                                cv2.imwrite(frame_filename, debug_frame)
-
-                frame_count += 1
-            if len(all_charuco_corners) > 0 and len(all_charuco_ids) > 0:
-
-                if self.status_queue:
-                    self.status_queue.put(("Computing Calibration", "-"))
-                ret, mtx, dist, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(all_charuco_corners,
-                                                                                all_charuco_ids,
-                                                                                self.board,
-                                                                                gray.shape[::-1], None, None)
-
-                if self.status_queue:
-                    self.status_queue.put(("", "-"))
-                np.savez(save_path, mtx=mtx, dist=dist)
-                if self.status_queue:
-                    self.status_queue.put(
-                        (f"Calibration done for video {self.video_name}. File saved at {save_path}", "DEBUG"))
-
-                    # self.status_queue.put((f'STARTING CORRECTION FOR VIDEO {self.video_name}', 'INFO'))
-                    output_vid_path = self.process_video(video_path, save_path)
-                    self.correct_et_orig_dict[video_path] = output_vid_path
-                    save_path_ = sep_direc_files(save_path)
-                    output_vid_path_ = sep_direc_files(output_vid_path)
-                    self.calibrate_correct_dict[video_path] = [save_path_, output_vid_path_]
-
-        table_header = "\n_____________________________________________________________________________________________________________________________________________________________________\n"
-        table_header += f"PROJECT FOLDER PATH                      ||    {self.projectname}"
-        table_header += "\n____________________________________________________________________________________________________________________________________________________________________\n"
-        table_header += f" Input Video                                       ||    Calibration File                                                                   |         Corrected Video                                                          "
-        table_header += "\n-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
-
-        self.status_queue.put((table_header, "-"))
-        print(self.correct_et_orig_dict)
-        for old_video, corrected_vid in self.calibrate_correct_dict.items():
-            old_video_name = os.path.basename(old_video).split('.')[0]
-
-            # Assuming corrected_vid is a list with exactly two elements
-            calib_file, new_video = corrected_vid
-
-            # Use string formatting to align the text correctly within the table
-            table_row = f"{old_video_name[:20]:<39} |    {calib_file:<25}     | {new_video:<15}"
-
-            self.status_queue.put((table_row, "-"))
-            self.status_queue.put(
-                (
-                    "\n-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------",
-                    "-"))
+        self.status_queue.put(("", "-"))
         self.status_queue.put(('', 'CC-done'))
+        self.display_video_dict = self.correct_et_orig_dict.copy()
+        self.status_queue.put((self.calibrate_correct_dict, 'update-treeview'))
+        self.correct_et_orig_dict.clear()
 
     def calibrate_single_video(self, single_video_calib):
         cap = cv2.VideoCapture(single_video_calib)
         if not cap.isOpened():
-            self.status_queue.put((f'Could not open Video File {single_video_calib}. Exiting...', ""))
+            self.status_queue.put((f'Could not open Video File {single_video_calib}. Exiting...', "INFO"))
             return
         frame_count = 0
         gray = None
         all_charuco_corners = []
         all_charuco_ids = []
+        animation_started = False
+        video_name = os.path.basename(single_video_calib).split('.')[0]
+        rejected_folder = os.path.join(self.rejected_frames_dir, video_name)
+        create_dir(rejected_folder)
         while True:
             ret, frame = cap.read()
+            if self.stop_requested is not None:
+                break
             if not ret:
-                self.status_queue((f'Done Processing Video {single_video_calib}', 'INFO'))
+                self.video_frame.delete("all")
+                self.status_queue.put((f'Done Processing Video {single_video_calib}', 'INFO'))
+                self.status_queue.put(('', 'stop-anime'))
                 break
             if frame_count % self.frame_interval_calib == 0:
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -455,40 +378,65 @@ class CalibrateCorrect:
                     debug_frame = cv2.aruco.drawDetectedMarkers(frame.copy(), corners, ids)
                     ret, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(corners, ids, gray,
                                                                                             self.board, charucoIds=ids)
+                    if self.status_queue and not animation_started:
+                        self.status_queue.put(("Collecting Corners and IDs for Calibration", "anime"))
+                        animation_started = True
 
                     if self.display == 'Yes':
                         debug_frame_ = cv2.resize(debug_frame, (440, 360))
                         self.video_frame.img = ImageTk.PhotoImage(
                             image=Image.fromarray(cv2.cvtColor(debug_frame_, cv2.COLOR_BGR2RGB)))
-                    self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
+                        self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
 
                     if not ret or len(charuco_corners) <= self.min_corners:
-                        self.status_queue.put((f'Not enough corners for interpolation', 'DEBUG'))
+                        self.status_queue.put((f'Frame {frame_count}- Not enough corners for interpolation', 'DEBUG'))
+                        rejected_frame_filename = os.path.join(rejected_folder, f'{video_name}_{frame_count}.png')
+                        cv2.imwrite(rejected_frame_filename, debug_frame)
+                        if animation_started:
+                            self.status_queue.put(("Collecting Corners and IDs for Calibration", "anime"))
                     else:
                         all_charuco_corners.append(charuco_corners)
                         all_charuco_ids.append(charuco_ids)
+                        if self.save_calib_frames is not None and frame_count % self.save_calib_frames == 0:
+                            frame_filename = os.path.join(self.calib_frames, video_name,
+                                                          f'{video_name}_{frame_count}.png')
+                            cv2.imwrite(frame_filename, debug_frame)
+                else:
+                    self.status_queue.put((f"Frame {frame_count} - Not enough corners for interpolation", "DEBUG"))
+                    if animation_started:
+                        self.status_queue.put(("Collecting Corners and IDs for Calibration", "anime"))
+
 
             frame_count += 1
 
         if len(all_charuco_corners) > 0 and len(all_charuco_ids) > 0:
+            # Status to show computing extrinsic and intrinsic parameters
+            self.status_queue.put(('COMPUTING EXTRINSIC AND INTRINSIC PARAMETERS', "anime"))
             ret, mtx, dist, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(
                 all_charuco_corners, all_charuco_ids, self.board, gray.shape[::-1], None, None)
 
             save_path = f'{self.param_folder}/calibration_{os.path.basename(single_video_calib)}.npz'
+
             np.savez(save_path, mtx=mtx, dist=dist)
-            self.status_queue((f'Calibration done for video {single_video_calib}. File saved at {save_path}', 'INFO'))
+            if self.status_queue:
+                self.status_queue.put(('', "-"))
 
             cap.release()
             return save_path
 
     def singleCalibMultiCorrect(self, single_calib_video):
+        self.animation_active = True
+        self.status_queue.put((f'STARTING CALIBRATION FOR CALIBRATION VIDEO', 'INFO'))
         calib_file_path = self.calibrate_single_video(single_calib_video)
+        if self.animation_active:
+            self.status_queue.put(
+                (f'Calibration done for video {os.path.basename(single_calib_video)}. File saved at {calib_file_path}',
+                 '-'))
         if calib_file_path is None:
+            print(f'Calibration file {calib_file_path} does not exist')
             self.status_queue.put(('Calibration Failed. Exiting...', 'DEBUG'))
             self.stop_requested = True
-
-        corrected_et_orginal = {}
-        corrected_video_paths = {}
+        self.status_queue.put(('STARTING VIDEO CORRECTION', 'DEBUG'))
 
         total_vids_len = len(self.video_files)
         for idx, video_path in enumerate(self.video_files):
@@ -496,30 +444,13 @@ class CalibrateCorrect:
                 self.status_queue.put((f'Correcting Videos {idx + 1} of {total_vids_len}', 'INFO'))
 
             output_vid_path = self.process_video(video_path, calib_file_path)
-            corrected_et_orginal[video_path] = output_vid_path
+            self.correct_et_orig_dict[video_path] = output_vid_path
             save_path_ = sep_direc_files(calib_file_path)
             output_vid_path_ = sep_direc_files(output_vid_path)
-            corrected_video_paths[video_path] = [save_path_, output_vid_path_]
-        table_header = "\n_____________________________________________________________________________________________________________________________________________________________________\n"
-        table_header += f"PROJECT FOLDER PATH                      ||    {self.projectname}"
-        table_header += "\n____________________________________________________________________________________________________________________________________________________________________\n"
-        table_header += f" Input Video                                       ||    Calibration File                                                                   |         Corrected Video                                                          "
-        table_header += "\n-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
+            self.calibrate_correct_dict[video_path] = [save_path_, output_vid_path_]
 
-
-        self.status_queue.put((table_header, "-"))
-        for old_video, corrected_vid in corrected_video_paths.items():
-            old_video_name = os.path.basename(old_video).split('.')[0]
-
-            # Assuming corrected_vid is a list with exactly two elements
-            calib_file, new_video = corrected_vid
-
-            # Use string formatting to align the text correctly within the table
-            table_row = f"{old_video_name[:20]:<39} |    {calib_file:<25}     | {new_video:<15}"
-
-            self.status_queue.put((table_row, "-"))
-            self.status_queue.put(
-                (
-                    "\n-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------",
-                    "-"))
+        self.status_queue.put(("", "-"))
         self.status_queue.put(('', 'CC-done'))
+        self.display_video_dict = self.correct_et_orig_dict.copy()
+        self.status_queue.put((self.calibrate_correct_dict, 'update-treeview'))
+        self.correct_et_orig_dict.clear()
