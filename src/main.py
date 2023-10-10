@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, simpledialog, messagebox
-from calibrate_correct import CalibrateCorrect
+from calibrate_correct import CalibrateCorrect, DICTIONARY
 import configparser
 from tkinter import Canvas, StringVar
 import threading
@@ -166,16 +166,17 @@ class CalibrationApp:
         # self.single_video_label.grid(row=n_rows + 1, column=0, sticky="w")  # Adjust row as needed
         # self.single_video_entry.grid(row=n_rows + 1, column=1)  # Adjust row as needed
         # self.single_video_button.grid(row=n_rows + 1, column=2)  # Adjust row as needed
-        self.dictionary_options = [
-            'DICT_4X4_50', 'DICT_4X4_100', 'DICT_4X4_250', 'DICT_4X4_1000', 'DICT_5X5_50',
-            'DICT_5X5_100', 'DICT_5X5_250', 'DICT_5X5_1000',
-            'DICT_6X6_50', 'DICT_6X6_100', 'DICT_6X6_250', 'DICT_6X6_1000',
-            'DICT_7X7_50', 'DICT_7X7_100', 'DICT_7X7_250', 'DICT_7X7_1000',
-            'DICT_ARUCO_ORIGINAL', 'DICT_APRILTAG_16h5', 'DICT_APRILTAG_16H5',
-            'DICT_APRILTAG_25h9', 'DICT_APRILTAG_25H9', 'DICT_APRILTAG_36h10',
-            'DICT_APRILTAG_36H10', 'DICT_APRILTAG_36h11', 'DICT_APRILTAG_36H11',
-            'DICT_ARUCO_MIP_36h12', 'DICT_ARUCO_MIP_36H12'
-        ]
+        self.dictionary_options = DICTIONARY
+        # self.dictionary_options = [
+        #     'DICT_4X4_50', 'DICT_4X4_100', 'DICT_4X4_250', 'DICT_4X4_1000', 'DICT_5X5_50',
+        #     'DICT_5X5_100', 'DICT_5X5_250', 'DICT_5X5_1000',
+        #     'DICT_6X6_50', 'DICT_6X6_100', 'DICT_6X6_250', 'DICT_6X6_1000',
+        #     'DICT_7X7_50', 'DICT_7X7_100', 'DICT_7X7_250', 'DICT_7X7_1000',
+        #     'DICT_ARUCO_ORIGINAL', 'DICT_APRILTAG_16h5', 'DICT_APRILTAG_16H5',
+        #     'DICT_APRILTAG_25h9', 'DICT_APRILTAG_25H9', 'DICT_APRILTAG_36h10',
+        #     'DICT_APRILTAG_36H10', 'DICT_APRILTAG_36h11', 'DICT_APRILTAG_36H11',
+        #     'DICT_ARUCO_MIP_36h12', 'DICT_ARUCO_MIP_36H12'
+        # ]
         self.dictionary_label_style = {'foreground': '#000000', 'font': ('Helvetica', 12)}
         ttk.Label(self.input_frame, text="Dictionary:", **self.dictionary_label_style).grid(row=len(self.params) + 1,
                                                                                             column=0,
