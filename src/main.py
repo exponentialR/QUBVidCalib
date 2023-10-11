@@ -36,13 +36,6 @@ class CalibrationApp:
         self.display_video_menu = None
         self.frame_interval_entry = None
         self.save_every_n_frames_entry = None
-        # self.calib_instance = None
-
-        # self.tree = ttk.Treeview(self.status_frame, columns=("Old Video", "Calibration File", "New Video"))
-        # self.tree.heading("#1", text="Old Video")
-        # self.tree.heading("#2", text="Calibration File")
-        # self.tree.heading("#3", text="New Video")
-        # self.tree.pack(side="bottom", fill="both", expand=True)
 
         # Initialize variables
         self.proj_repo_var = tk.StringVar()
@@ -70,7 +63,6 @@ class CalibrationApp:
             ("Save Every N Frames:", self.save_every_n_frames_var, None, None),
 
         ]
-
 
         # Initialize frames
         self.container = tk.Frame(self.root)
@@ -142,6 +134,9 @@ class CalibrationApp:
                                                                                                        sticky='ew',
                                                                                                        padx=20)
 
+        ttk.Button(self.start_frame, text='GENERATE CALIBRATION PATTERN', command=self.generate_calib_pattern).grid(
+            row=9, column=0, pady=10, sticky='ew', padx=20)
+
         # Start Task button
         self.start_task_button = ttk.Button(self.input_frame, text="Start Task", command=self.start_task)
         self.start_task_button.grid(row=len(self.params) + 3, column=1, padx=5, pady=5)
@@ -211,7 +206,6 @@ class CalibrationApp:
         self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
         self.back_button.pack()
 
-
         self.status_text_frame = tk.Frame(self.status_frame)
         self.status_text_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
@@ -238,6 +232,42 @@ class CalibrationApp:
         self.load_entries_from_config()
         self.root.after(10, self.update_gui)
         self.root.mainloop()
+
+    def generate_calib_pattern(self):
+        # Open a dialog to input parameters for calibration pattern
+        self.newWindow = tk.Toplevel(self.root)
+        self.newWindow.title("Generate Calibration Pattern")
+
+        ttk.Label(self.input_frame, text="Dictionary:", **self.dictionary_label_style).grid(row=len(self.params) + 1,
+                                                                                            column=0,
+                                                                                            sticky="w")
+        self.dictionary_menu = ttk.OptionMenu(self.input_frame, self.dictionary_var, self.dictionary_options[0],
+                                              *self.dictionary_options)
+        self.dictionary_menu.grid(row=len(self.params) + 1, column=1)
+        self.pattern_type_var = tk.StringVar()
+        self.rows_var = tk.StringVar()
+        self.columns_var = tk.StringVar()
+
+        tk.Label(self.newWindow, text="Pattern Type: ").grid(row=0, column=0)
+        tk.Entry(self.newWindow, textvariable=self.pattern_type_var).grid(row=0, column=1)
+
+        tk.Label(self.newWindow, text="Rows: ").grid(row=1, column=0)
+        tk.Entry(self.newWindow, textvariable=self.rows_var).grid(row=1, column=1)
+
+        tk.Label(self.newWindow, text="Columns: ").grid(row=2, column=0)
+        tk.Entry(self.newWindow, textvariable=self.columns_var).grid(row=2, column=1)
+
+        ttk.Button(self.newWindow, text="Generate", command=self.call_generate_function).grid(row=3, columnspan=2)
+
+    def call_generate_function(self):
+        # Get the parameters
+        pattern_type = self.pattern_type_var.get()
+        rows = int(self.rows_var.get())
+        columns = int(self.columns_var.get())
+
+        # Here, you'd call the actual function that generates the calibration pattern
+        # generate_pattern(pattern_type, rows, columns, ...)
+        print(f"Generating pattern with {pattern_type}, {rows} rows, and {columns} columns.")
 
     def browse_single_video_file(self):
         single_video_file = filedialog.askopenfilename(
@@ -352,7 +382,6 @@ class CalibrationApp:
             self.dictionary_var.set(config['Parameters'].get('Dictionary', ''))
             self.display_video_var.set(config['Parameters'].get('Display Video', ''))
 
-
     def shift_down_widgets(self, start_row, shift_amount):
         for child in self.input_frame.winfo_children():
             info = child.grid_info()
@@ -466,12 +495,11 @@ class CalibrationApp:
     def _start_animation_helper(self, initial_text, animation_id):
         if self.current_animation_id == animation_id:
             num_dots = int(datetime.now().timestamp()) % 5
-            animated_text = f"{initial_text} {'|||' *num_dots}"
+            animated_text = f"{initial_text} {'|||' * num_dots}"
             self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
             self.status_text.insert(self.animated_text_index, animated_text)
 
             self.root.after(500, lambda: self._start_animation_helper(initial_text, animation_id))
-
 
     def stop_animation(self):
         self.animation_stop = True
