@@ -99,9 +99,9 @@ class CalibrationApp:
 
         self.welcome_frame.grid(row=0, column=0, columnspan=3, pady=20, sticky='ew')
         # Create the Label first
-        self.welcome_label = tk.Label(self.welcome_frame, text="Welcome to Camera Calibration and Correction",
+        self.welcome_label = tk.Label(self.welcome_frame, text="Camera Calibration Toolbox",
                                       **self.label_style)
-        self.welcome_label.config(font=('Courier New', 30, 'bold'))
+        self.welcome_label.config(font=('Courier New', 25, 'bold'))
         self.welcome_label.grid(row=0, column=0)
 
         self.welcome_frame.grid_columnconfigure(0, weight=2)
