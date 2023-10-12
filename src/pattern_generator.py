@@ -1,6 +1,6 @@
 import datetime
 import os.path
-
+from pathlib import Path
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
@@ -30,11 +30,23 @@ PAPER_SIZES = {
     "Tabloid": TABLOID, "Ledger": LEDGER
 }
 
+DICTIONARY = [
+    'DICT_4X4_50', 'DICT_4X4_100', 'DICT_4X4_250', 'DICT_4X4_1000', 'DICT_5X5_50',
+    'DICT_5X5_100', 'DICT_5X5_250', 'DICT_5X5_1000',
+    'DICT_6X6_50', 'DICT_6X6_100', 'DICT_6X6_250', 'DICT_6X6_1000',
+    'DICT_7X7_50', 'DICT_7X7_100', 'DICT_7X7_250', 'DICT_7X7_1000',
+    'DICT_ARUCO_ORIGINAL', 'DICT_APRILTAG_16h5', 'DICT_APRILTAG_16H5',
+    'DICT_APRILTAG_25h9', 'DICT_APRILTAG_25H9', 'DICT_APRILTAG_36h10',
+    'DICT_APRILTAG_36H10', 'DICT_APRILTAG_36h11', 'DICT_APRILTAG_36H11',
+    'DICT_ARUCO_MIP_36h12', 'DICT_ARUCO_MIP_36H12'
+]
+
 
 class PatternGenerator:
-    def __init__(self, pattern_type, rows, columns, checker_width, dictionary=None, marker_et_percentage=None,
-                 margin=10,
-                 pattern_name=datetime.datetime.now(), dpi: int = 300):
+    def __init__(self, pattern_location: Path, pattern_type: str, rows: int, columns: int, checker_width: int,
+                 dictionary: str = None, marker_et_percentage: float = None,
+                 margin: int = 10,
+                 pattern_name=datetime.datetime.now(), dpi: int = 300, status_queue=None):
 
         self.pattern_type = pattern_type
         self.pattern_size = (rows, columns)
@@ -48,7 +60,9 @@ class PatternGenerator:
         self.paper_sizes = PAPER_SIZES
         self.pattern_name = pattern_name
         self.dpi = dpi
-        os.makedirs('Generated') if not os.path.exists('Generated') else None
+        self.status_queue = status_queue
+        self.project_dir = os.path.join(pattern_location, 'Generated-CalibPattern')
+        os.makedirs(self.project_dir) if not os.path.exists(self.project_dir) else None
 
     def generate_checkerboard(self):
         # Calculate image dimensions
@@ -60,7 +74,8 @@ class PatternGenerator:
 
         # Calculate the pixel value of the margin
         margin_px = int((self.margin / 25.4) * self.dpi)
-
+        if self.status_queue is not None:
+            self.status_queue.put(('DRAWING CHECKERBOARD PATTERN', "anime"))
         # Draw the checkerboard
         square_size_px = int((self.square_size / 25.4) * self.dpi)
         for i in range(self.pattern_size[0]):
@@ -72,10 +87,11 @@ class PatternGenerator:
                 x2 = (j + 1) * square_size_px + margin_px
                 y2 = (i + 1) * square_size_px + margin_px
                 pattern_image[y1:y2, x1:x2] = 0
-
+        self.status_queue.put(('GENEARATED CHECKBOARD PATTERN', 'stop-anime'))
         return pattern_image
 
     def export_to_pdf(self, image):
+        self.status_queue.put(('SAVING TO PDF', 'anime'))
         # Create a Matplotlib figure and axis
         fig, ax = plt.subplots(figsize=(self.board_width / 25.4 + 2 * self.margin / 25.4,
                                         self.board_height / 25.4 + 2 * self.margin / 25.4), dpi=self.dpi)
@@ -114,8 +130,9 @@ class PatternGenerator:
                     ha='center')
 
         # Save as PDF
-        pdf_path = f"Generated/{self.pattern_type.title()}-{self.pattern_name.strftime('%Y%m%d_%H%M%S')}.pdf"
+        pdf_path = f"{self.project_dir}/{self.pattern_type.title()}-{self.pattern_name.strftime('%Y%m%d_%H%M%S')}.pdf"
         plt.savefig(pdf_path, bbox_inches='tight', pad_inches=0, dpi=self.dpi)
+        self.status_queue.put((f'CALIBRATION PATTERN PDF SAVED TO {pdf_path}', 'stop-anime'))
         print(f"PDF saved to {pdf_path}")
 
     def get_paper_orientation(self, name):
@@ -174,6 +191,7 @@ class PatternGenerator:
         return pattern_image
 
     def recommend_paper_size(self):
+        self.status_queue.put(('GETTING RECOMMENDED PAPER SIZE', 'INFO'))
         total_width_mm = self.board_width + 2 * self.margin
         total_height_mm = self.board_height + 2 * self.margin
 
@@ -194,4 +212,3 @@ class PatternGenerator:
                 return size_name  # Return the first suitable size found
 
         return 'Custom Size'  # Return 'Custom Size' if no suitable size was found
-
