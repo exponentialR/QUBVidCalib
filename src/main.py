@@ -1,7 +1,6 @@
 import tkinter as tk
 import uuid
 from tkinter import ttk, filedialog, simpledialog, messagebox
-from calibrate_correct import CalibrateCorrect
 import configparser
 from tkinter import Canvas, StringVar
 import threading
@@ -10,6 +9,8 @@ from datetime import datetime
 import webbrowser
 # from utils import SharedState
 import os
+from calibrate_correct import CalibrateCorrect
+from pattern_generator import PatternGenerator
 
 
 # TODO : Add the play/Pause and slider button to the
@@ -53,7 +54,6 @@ class CalibrationApp:
         self.params = [
             ("Project Repository:", self.proj_repo_var, self.browse_proj_repo, None),
             ("Project Name:", self.project_name_var, None, None),
-            # ("Calibration Video:", self.single_video_file_var, self.browse_single_video_file, None),
             ("Video Files (for correction):", self.video_files_var, self.browse_video_files, None),
             ("SquaresX:", self.squaresX_var, None, None),
             ("SquaresY:", self.squaresY_var, None, None),
@@ -80,7 +80,7 @@ class CalibrationApp:
 
         self.made_with_love_label = tk.Label(self.start_frame, text="Made with ❤️ @ Queen's University Belfast.",
                                              bg='#ADD8E6',
-                                             fg='black')  # Adjust the background and foreground colors to match your theme
+                                             fg='black')
         self.made_with_love_label.grid(row=1000, column=0, pady=100, padx=20, sticky='ew', columnspan=50)
 
         self.start_frame.grid_columnconfigure(0, weight=1)
@@ -483,14 +483,6 @@ class CalibrationApp:
             new_animation_id = uuid.uuid4()
             self.current_animation_id = new_animation_id
             self._start_animation_helper(initial_text, new_animation_id)
-            # num_dots = int(datetime.now().timestamp()) % 5
-            # animated_text = f"{initial_text} {'|||' * num_dots}"
-            #
-            # # Update the text at the animated_text_index
-            # self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
-            # self.status_text.insert(self.animated_text_index, animated_text)
-            #
-            # self.root.after(500, lambda: self.start_animation(initial_text))
 
     def _start_animation_helper(self, initial_text, animation_id):
         if self.current_animation_id == animation_id:
@@ -593,6 +585,21 @@ class CalibrationApp:
         )
         self.current_thread = threading.Thread(target=self.calib_instance.calibrate_only)  # .start()
         self.current_thread.start()
+
+    # pattern_type, rows, columns, checker_width, dictionary = None, marker_et_percentage = None,
+    # margin = 10,
+    # pattern_name = datetime.datetime.now(), dpi: int = 300
+    def on_generate_pattern_click(self):
+        self.show_frame(self.status_frame, 'Generate Calibration Pattern')
+        self.calib_instance = PatternGenerator(self.pattern_type_var.get(),
+                                                 self.rows_var.get(),
+                                                 self.columns_var.get(),
+                                                 self.checker_width_var.get(),
+                                                 self.dictionary_var.get(),
+                                                 self.marker_et_percentage_var.get(),
+                                                 self.margin_var.get(),
+                                                 self.dpi_var.get(),)
+        self.current_thread = threading.Thread(target=self.calib_instance.generate())
 
     def on_correct_only_click(self):
         self.show_frame(self.status_frame, "Correct Only")

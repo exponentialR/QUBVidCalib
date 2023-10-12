@@ -134,9 +134,11 @@ class PatternGenerator:
 
     def generate(self):
         if self.pattern_type == 'checkerboard':
-            return self.generate_checkerboard()
+            checker_board = self.generate_checkerboard()
+            return self.export_to_pdf(checker_board)
         elif self.pattern_type == 'charuco':
-            return self.generate_charuco()
+            charuco_board = self.generate_charuco()
+            return self.export_to_pdf(charuco_board)
         else:
             raise ValueError("Unsupported pattern type")
 
