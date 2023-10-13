@@ -64,7 +64,6 @@ class CalibrationApp:
 
         ]
 
-
         # Initialize frames
         self.container = tk.Frame(self.root)
         self.container.pack(side="top", fill="both", expand=True)
@@ -207,7 +206,6 @@ class CalibrationApp:
         self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
         self.back_button.pack()
 
-
         self.status_text_frame = tk.Frame(self.status_frame)
         self.status_text_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
@@ -267,7 +265,6 @@ class CalibrationApp:
         # generate_pattern(pattern_type, rows, columns, ...)
         print(f"Generating pattern with {pattern_type}, {rows} rows, and {columns} columns.")
 
-
     def browse_single_video_file(self):
         single_video_file = filedialog.askopenfilename(
             filetypes=[
@@ -306,7 +303,7 @@ class CalibrationApp:
         self.calib_instance.stop()
         self.status_queue.queue.clear()
 
-        # Wait for the thread to stop (optional and should be used cautiously)
+        # Wait for the thread to stop
         if self.current_thread and self.current_thread.is_alive():
             self.current_thread.join(timeout=1)
 
@@ -326,8 +323,6 @@ class CalibrationApp:
 
         # Show the starting frame again
         self.show_frame(self.start_frame)
-
-        # Optionally, display a user feedback message that the task has been stopped
         messagebox.showinfo("Task Stopped", "The running task has been stopped.")
 
     def browse_proj_repo(self):
@@ -380,7 +375,6 @@ class CalibrationApp:
             self.save_every_n_frames_var.set(config['Parameters'].get('Save Every N Frames', ''))
             self.dictionary_var.set(config['Parameters'].get('Dictionary', ''))
             self.display_video_var.set(config['Parameters'].get('Display Video', ''))
-
 
     def shift_down_widgets(self, start_row, shift_amount):
         for child in self.input_frame.winfo_children():
@@ -495,12 +489,11 @@ class CalibrationApp:
     def _start_animation_helper(self, initial_text, animation_id):
         if self.current_animation_id == animation_id:
             num_dots = int(datetime.now().timestamp()) % 5
-            animated_text = f"{initial_text} {'|||' *num_dots}"
+            animated_text = f"{initial_text} {'|||' * num_dots}"
             self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
             self.status_text.insert(self.animated_text_index, animated_text)
 
             self.root.after(500, lambda: self._start_animation_helper(initial_text, animation_id))
-
 
     def stop_animation(self):
         self.animation_stop = True

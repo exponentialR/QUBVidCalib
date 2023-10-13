@@ -1,5 +1,9 @@
 # SharedState.py
 import tkinter as tk
+import webbrowser
+def open_web_page(event):
+    webbrowser.open('http://github.com/exponentialR')
+
 
 class SharedState:
     def __init__(self, master):

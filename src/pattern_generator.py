@@ -4,6 +4,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+import io
+from PIL import Image, ImageTk
+from tkinter import NW
 
 from reportlab.lib.pagesizes import landscape, portrait
 from reportlab.lib.pagesizes import JUNIOR_LEGAL, HALF_LETTER, A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, \
@@ -42,15 +45,27 @@ DICTIONARY = [
 ]
 
 
+def fig_to_np(fig, ax):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0)
+    buf.seek(0)
+    img_arr = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+    buf.close()
+    img = cv2.imdecode(img_arr, 1)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img
+
+
 class PatternGenerator:
     def __init__(self, pattern_location: Path, pattern_type: str, rows: int, columns: int, checker_width: int,
-                 dictionary: str = None, marker_et_percentage: float = None,
+                 marker_et_percentage=None, dictionary: str = None,
                  margin: int = 10,
-                 pattern_name=datetime.datetime.now(), dpi: int = 300, status_queue=None):
-
+                 pattern_name=datetime.datetime.now(), dpi: int = 300, status_queue=None, video_frame=None):
+        marker_et_percentage = float(marker_et_percentage) if marker_et_percentage is not None else None
         self.pattern_type = pattern_type
         self.pattern_size = (rows, columns)
-        self.square_size = checker_width  # This is indeed the width of each square in the checkerboard
+        self.square_size = int(checker_width)
+        print(f'SQUARE SIZE: {self.square_size}')
         self.board_width = columns * checker_width  # Updated
         self.board_height = rows * checker_width  # Updated
         self.dictionary = dictionary
@@ -63,8 +78,44 @@ class PatternGenerator:
         self.status_queue = status_queue
         self.project_dir = os.path.join(pattern_location, 'Generated-CalibPattern')
         os.makedirs(self.project_dir) if not os.path.exists(self.project_dir) else None
+        self.stop_requested = False
+        self.video_frame = video_frame
+
+    def generate_charuco(self) -> np.ndarray:
+        if self.stop_requested:
+            return np.array([])
+        if not self.marker_length or not self.dictionary:
+            raise ValueError("Both Marker Length and Dictionary should be provided for Charuco pattern. ")
+        # Calculate image dimensions
+        width_px = int((self.board_width / 25.4 + 2 * self.margin / 25.4) * self.dpi)
+        height_px = int((self.board_height / 25.4 + 2 * self.margin / 25.4) * self.dpi)
+        print(f'Height of PX : {height_px}')
+        print(f'Width of PX: {width_px}')
+        # Calculate the pixel value of the margin
+        margin_px = int((self.margin / 25.4) * self.dpi)
+
+        # Create ArUco dictionaryy
+        aruco_dict = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, self.dictionary))
+
+        # Create Charuco board
+        charuco_board = cv2.aruco.CharucoBoard((self.pattern_size[1], self.pattern_size[0]),
+                                               self.square_size / 1000, self.marker_length / 1000,
+                                               aruco_dict
+                                               )
+        # Generate Charuco pattern
+        charuco_image = charuco_board.generateImage((width_px - 2 * margin_px, height_px - 2 * margin_px))
+
+        # Create a white image with margins
+        pattern_image = np.ones((height_px, width_px), dtype=np.uint8) * 255
+
+        # Place the Charuco pattern on it
+        pattern_image[margin_px:-margin_px, margin_px:-margin_px] = charuco_image
+
+        return pattern_image
 
     def generate_checkerboard(self):
+        if self.stop_requested:
+            return np.array([])
         # Calculate image dimensions
         width_px = int((self.board_width / 25.4 + 2 * self.margin / 25.4) * self.dpi)
         height_px = int((self.board_height / 25.4 + 2 * self.margin / 25.4) * self.dpi)
@@ -87,7 +138,7 @@ class PatternGenerator:
                 x2 = (j + 1) * square_size_px + margin_px
                 y2 = (i + 1) * square_size_px + margin_px
                 pattern_image[y1:y2, x1:x2] = 0
-        self.status_queue.put(('GENEARATED CHECKBOARD PATTERN', 'stop-anime'))
+        self.status_queue.put(('GENERATED CHECKERBOARD PATTERN', 'stop-anime'))
         return pattern_image
 
     def export_to_pdf(self, image):
@@ -135,6 +186,18 @@ class PatternGenerator:
         self.status_queue.put((f'CALIBRATION PATTERN PDF SAVED TO {pdf_path}', 'stop-anime'))
         print(f"PDF saved to {pdf_path}")
 
+        # Convert to NumPy array
+        img = fig_to_np(fig, ax)
+
+        # Resize and show on Tkinter (replace 'self.video_frame' and 'self.video_frame.img' with your actual canvas and image objects)
+        img_resized = cv2.resize(img, (440, 360))
+        tk_img = ImageTk.PhotoImage(image=Image.fromarray(img_resized))
+        self.status_queue.put((f'Displaying Generated Pattern: {self.pattern_name}.pdf', 'anime'))
+        self.video_frame.img = tk_img  # Update the PhotoImage object
+        self.video_frame.create_image(0, 0, image=tk_img, anchor=NW)
+        self.status_queue.put((f'Done', 'stop-anime'))
+        self.status_queue.put((f'Please click on the link below to locate the calibration pattern: {pdf_path}', 'INFO'))
+
     def get_paper_orientation(self, name):
         paper_size = self.paper_sizes[name]
         if self.board_width > self.board_height:
@@ -150,45 +213,21 @@ class PatternGenerator:
         return width_pt, height_pt
 
     def generate(self):
-        if self.pattern_type == 'checkerboard':
+        if self.stop_requested:
+            return
+        if self.pattern_type.lower() == 'checker':
             checker_board = self.generate_checkerboard()
+            if self.stop_requested:
+                return
             return self.export_to_pdf(checker_board)
-        elif self.pattern_type == 'charuco':
+        elif self.pattern_type.lower() == 'charuco':
             charuco_board = self.generate_charuco()
+            if self.stop_requested:
+                return
             return self.export_to_pdf(charuco_board)
         else:
             raise ValueError("Unsupported pattern type")
-
-    def generate_charuco(self) -> np.ndarray:
-        if not self.marker_length or not self.dictionary:
-            raise ValueError("Both Marker Length and Dictionary should be provided for Charuco pattern. ")
-        # Calculate image dimensions
-        width_px = int((self.board_width / 25.4 + 2 * self.margin / 25.4) * self.dpi)
-        height_px = int((self.board_height / 25.4 + 2 * self.margin / 25.4) * self.dpi)
-        print(f'Height of PX : {height_px}')
-        print(f'Width of PX: {width_px}')
-        # Calculate the pixel value of the margin
-        margin_px = int((self.margin / 25.4) * self.dpi)
-
-        # Create ArUco dictionaryy
-
-        aruco_dict = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, self.dictionary))
-
-        # Create Charuco board
-        charuco_board = cv2.aruco.CharucoBoard((self.pattern_size[1], self.pattern_size[0]),
-                                               self.square_size / 1000, self.marker_length / 1000,
-                                               aruco_dict
-                                               )
-        # Generate Charuco pattern
-        charuco_image = charuco_board.generateImage((width_px - 2 * margin_px, height_px - 2 * margin_px))
-
-        # Create a white image with margins
-        pattern_image = np.ones((height_px, width_px), dtype=np.uint8) * 255
-
-        # Place the Charuco pattern on it
-        pattern_image[margin_px:-margin_px, margin_px:-margin_px] = charuco_image
-
-        return pattern_image
+        # self.status_queue.put(())
 
     def recommend_paper_size(self):
         self.status_queue.put(('GETTING RECOMMENDED PAPER SIZE', 'INFO'))
@@ -212,3 +251,6 @@ class PatternGenerator:
                 return size_name  # Return the first suitable size found
 
         return 'Custom Size'  # Return 'Custom Size' if no suitable size was found
+
+    def stop(self):
+        self.stop_requested = True

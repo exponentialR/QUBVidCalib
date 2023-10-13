@@ -5,7 +5,6 @@ import numpy as np
 from tkinter import NW
 
 from PIL import Image, ImageTk
-from tkinter import Button, Label, Scale, HORIZONTAL
 from tkinter import Button, Scale, HORIZONTAL
 
 # from utils import SharedState

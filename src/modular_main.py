@@ -1,6 +1,5 @@
 import tkinter as tk
 import uuid
-from functools import partial
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import configparser
@@ -21,28 +20,17 @@ def open_web_page(event):
 
 class CalibrationApp:
     def __init__(self, root_):
-
         self.copyright_label = None
         self.footer_frame = None
         self.animated_text_index = None
         self.status_queue = queue.Queue()
         self.root = root_
         self.root.geometry("1080x920")
-        self.root.title('Camera Calibration and Video Correction')
+        self.root.title('CalibraVision')
         self.root.configure(bg='black')
         self.create_footer(root_)
 
-        self.calib_instance = None
-        self.current_thread = None
-
-        self.animated_text = ""
-        self.animation_stop = False
-        self.LOG_LEVELS = ['INFO', 'DEBUG', 'ERROR', 'WARNING', 'CORRECTED', 'CC-done']
-
-        self.frame_interval_entry = None
-        self.save_every_n_frames_entry = None
-
-        # Initialize variables
+        # Initialize variables for Calibrations
         self.proj_repo_var = tk.StringVar()
         self.project_name_var = tk.StringVar()
         self.video_files_var = tk.StringVar()
@@ -55,7 +43,10 @@ class CalibrationApp:
         self.dictionary_var = tk.StringVar()
         self.single_video_file_var = tk.StringVar()
         self.dictionary_options = DICTIONARY
+
+        # Variables for Pattern Generator
         self.pattern_type_var = tk.StringVar()
+        self.pattern_type_var.trace('w', self.update_pattern_form)
         self.rows_var = tk.StringVar()
         self.columns_var = tk.StringVar()
         self.checker_width_var = tk.StringVar()
@@ -64,6 +55,8 @@ class CalibrationApp:
         self.dpi_var = tk.StringVar()
         self.display_video_var = tk.StringVar()
         self.display_video_options = ['Yes', 'No']
+        self.pattern_type_options = ['Charuco', 'Checker']
+
         self.dictionary_options = DICTIONARY
 
         self.params = [
@@ -76,21 +69,23 @@ class CalibrationApp:
             ("MarkerLength:", self.markerLength_var, None, None),
             ("Frame Interval:", self.frame_interval_calib_var, None, None),
             ("Save Every N Frames:", self.save_every_n_frames_var, None, None),
-            ('Dictionary:', self.dictionary_var, self.create_dictionary_dropdown, None),
-            ('Display Video During Calibration?:', self.display_video_var, self.create_video_display_dropdown, None)
+            ('Dictionary:', self.dictionary_var, self.create_dropdown, None),
+            ('Display Video During Calibration?:', self.display_video_var, self.create_dropdown, None)
         ]
 
-        self.pattern_params = [('Calibration Pattern Type:', self.pattern_type_var, None, None),
-                               ('Pattern Location (Where to save):', self.proj_repo_var, self.browse_proj_repo, None),
-                               ('Number of Rows:', self.rows_var, None, None),
-                               ('Number of Columns:', self.columns_var, None, None),
-                               ('Checker Width (mm):', self.checker_width_var, None, None),
-                               ('Percentage of Marker Length:', self.marker_et_percentage_var, None, None),
-                               ('Length of Side Margin (mm):', self.margin_var, None, None),
-                               ('Dots per Inch (dpi for printing):', self.dpi_var, None, None),
-                               ('Dictionary:', self.dictionary_var, self.create_dictionary_dropdown, None)
+        self.common_pattern_params = [('Calibration Pattern Type:', self.pattern_type_var, self.create_dropdown, None),
+                                      ('Pattern Location (Where to save):', self.proj_repo_var, self.browse_proj_repo,
+                                       None),
+                                      ('Number of Rows:', self.rows_var, None, None),
+                                      ('Number of Columns:', self.columns_var, None, None),
+                                      ('Square Size/Checker Width (mm):', self.checker_width_var, None, None),
+                                      ('Length of Side Margin (mm):', self.margin_var, None, None),
+                                      ('Dots per Inch (dpi for printing):', self.dpi_var, None, None), ]
 
-                               ]
+        self.charuco_exclusive_params = [('Dictionary:', self.dictionary_var, self.create_dropdown, None),
+                                         ('Marker/Square Ratio:', self.marker_et_percentage_var, None, None),
+                                         ]
+        self.checker_exclusive_params = []
 
         # Initialize frames
         self.container = tk.Frame(self.root)
@@ -101,6 +96,8 @@ class CalibrationApp:
         self.start_frame = ttk.Frame(self.container, style='My.TFrame')
         self.input_frame = ttk.Frame(self.container, style='My.TFrame')
         self.status_frame = ttk.Frame(self.container, style='My.TFrame')
+        self.pattern_type_menu = ttk.OptionMenu(self.input_frame, self.pattern_type_var, self.pattern_type_options[0],
+                                                *self.pattern_type_options)
         self.dictionary_menu = ttk.OptionMenu(self.input_frame, self.dictionary_var, self.dictionary_options[0],
                                               *self.dictionary_options)
         self.display_video_menu = ttk.OptionMenu(self.input_frame, self.display_video_var,
@@ -185,6 +182,16 @@ class CalibrationApp:
         self.tree.heading("#3", text="New Video")
         self.tree.pack(side="bottom", fill="both", expand=True)
 
+        self.calib_instance = None
+        self.current_thread = None
+
+        self.animated_text = ""
+        self.animation_stop = False
+        self.LOG_LEVELS = ['INFO', 'DEBUG', 'ERROR', 'WARNING', 'CORRECTED', 'CC-done']
+
+        self.frame_interval_entry = None
+        self.save_every_n_frames_entry = None
+
         self.back_button = tk.Button(self.status_frame, text="Back", command=self.go_back)
         self.back_button.pack()
 
@@ -219,8 +226,87 @@ class CalibrationApp:
         self.populate_form_based_on_task(text)
         frame.tkraise()
 
+    def update_gui(self):
+        try:
+            while True:
+                current_status, log_level = self.status_queue.get_nowait()
+                if log_level == "CORRECTED" or log_level == 'CC-done':
+                    display_video_side_side = messagebox.askyesno("Display Corrected Video(s)",
+                                                                  "Would you like to display the corrected videos?")
+                    if display_video_side_side and self.calib_instance:
+                        self.calib_instance.display_corrected_video()
+                elif log_level == "-" or log_level in self.LOG_LEVELS:
+                    self.animation_active = False
+                    self.stop_animation()
+                elif log_level == "update-treeview":
+                    for item in self.tree.get_children():
+                        self.tree.delete(item)
+                    for old_video, corrected_vid_details in current_status.items():
+                        old_video_name = os.path.basename(old_video).split('.')[0]
+                        calib_file, new_video = corrected_vid_details[0], corrected_vid_details[1]
+                        self.tree.insert("", tk.END, values=(old_video_name, calib_file, new_video))
+
+                elif log_level == 'display-pattern':
+                    """"""
+
+                self.insert_status_text(current_status, log_level)
+
+        except queue.Empty:
+            pass
+        self.root.after(10, self.update_gui)
+
+    def update_pattern_form(self, *args):
+        pattern_type = self.pattern_type_var.get()
+        if pattern_type == 'Charuco':
+            self.populate_pattern_form(self.charuco_exclusive_params)
+        else:
+            self.populate_pattern_form(self.checker_exclusive_params)
+
+    def on_generate_pattern_click(self):
+        self.show_frame(self.status_frame, 'Generate Calibration Pattern')
+        pattern_type = self.pattern_type_var.get()
+        if pattern_type == 'Charuco':
+            self.calib_instance = PatternGenerator(pattern_type=self.pattern_type_var.get(),
+                                                   rows=int(self.rows_var.get()),
+                                                   columns=int(self.columns_var.get()),
+                                                   checker_width=int(self.checker_width_var.get()),
+                                                   dictionary=self.dictionary_var.get(),
+                                                   marker_et_percentage=self.marker_et_percentage_var.get(),
+                                                   margin=int(self.margin_var.get()),
+                                                   dpi=int(self.dpi_var.get()),
+                                                   status_queue=self.status_queue,
+                                                   pattern_location=Path(self.proj_repo_var.get()),
+                                                   video_frame=self.video_display_frame)
+            self.current_thread = threading.Thread(target=self.calib_instance.generate)
+            self.current_thread.start()
+        elif pattern_type == 'Checker':
+            self.calib_instance = PatternGenerator(pattern_type=self.pattern_type_var.get(),
+                                                   rows=int(self.rows_var.get()),
+                                                   columns=int(self.columns_var.get()),
+                                                   checker_width=int(self.checker_width_var.get()),
+                                                   margin=int(self.margin_var.get()),
+                                                   dpi=int(self.dpi_var.get()),
+                                                   status_queue=self.status_queue,
+                                                   pattern_location=Path(self.proj_repo_var.get()),
+                                                   video_frame=self.video_display_frame)
+            self.current_thread = threading.Thread(target=self.calib_instance.generate)
+            self.current_thread.start()
+
+    def populate_pattern_form(self, exclusive_params):
+        all_params = self.common_pattern_params + exclusive_params
+        self.populate_form_with_params(all_params)
+
+    def create_dropdown(self, row, column, menu_attribute):
+        if hasattr(self, menu_attribute):
+            getattr(self, menu_attribute).grid_forget()
+            getattr(self, menu_attribute).grid(row=row, column=column)
+        else:
+            pass
+
     def populate_form_with_params(self, params):
-        print("Populating form with:", params)  # Debugging line
+        if not hasattr(self, 'task_label'):
+            self.task_label = tk.Label(self.input_frame, text="", font=("Verdana", 18, 'bold'), bg='#ADD8E6',
+                                       fg='#000000')
 
         for widget in self.input_frame.winfo_children():
             widget.grid_forget()
@@ -230,15 +316,17 @@ class CalibrationApp:
         n_rows = len(params)
 
         for i, (text, var, cmd, _) in enumerate(params):
-            print(text)
-
+            if not hasattr(self, 'label_style'):
+                self.label_style = {'bg': '#ADD8E6', 'fg': '#000000', 'font': ('Courier New', 12)}
             label = tk.Label(self.input_frame, text=text, **self.label_style)
             label.grid(row=i + 1, column=0, sticky="w")
 
             if text == 'Dictionary:':
-                cmd(i + 1, 1)
+                cmd(i + 1, 1, 'dictionary_menu')
             elif text == "Display Video During Calibration?:":
-                cmd(i + 1, 1)
+                cmd(i + 1, 1, 'display_video_menu')
+            elif text == 'Calibration Pattern Type:':
+                cmd(i + 1, 1, 'pattern_type_menu')
 
             else:
 
@@ -275,7 +363,11 @@ class CalibrationApp:
             self.shift_down_widgets(start_row=4, shift_amount=1)
 
         elif task == "Generate Calibration Pattern":
-            self.populate_form_with_params(self.pattern_params)
+            pattern_type = self.pattern_type_var.get()
+            if pattern_type == 'Charuco':
+                self.populate_pattern_form(self.charuco_exclusive_params)
+            else:
+                self.populate_pattern_form(self.checker_exclusive_params)
 
     def on_self_calibrate_correct_click(self):
         self.show_frame(self.status_frame, "Self-Calibrate & Correct")
@@ -337,21 +429,6 @@ class CalibrationApp:
             status_queue=self.status_queue
         )
         self.current_thread = threading.Thread(target=self.calib_instance.calibrate_only)  # .start()
-        self.current_thread.start()
-
-    def on_generate_pattern_click(self):
-        self.show_frame(self.status_frame, 'Generate Calibration Pattern')
-        self.calib_instance = PatternGenerator(pattern_type=self.pattern_type_var.get(),
-                                               rows=int(self.rows_var.get()),
-                                               columns=int(self.columns_var.get()),
-                                               checker_width=int(self.checker_width_var.get()),
-                                               dictionary=self.dictionary_var.get(),
-                                               marker_et_percentage=float(self.marker_et_percentage_var.get()),
-                                               margin=int(self.margin_var.get()),
-                                               dpi=int(self.dpi_var.get()),
-                                               status_queue=self.status_queue,
-                                               pattern_location=Path(self.proj_repo_var.get()), )
-        self.current_thread = threading.Thread(target=self.calib_instance.generate)
         self.current_thread.start()
 
     def on_correct_only_click(self):
@@ -441,16 +518,6 @@ class CalibrationApp:
         self.show_frame(self.status_frame, "Correct Only")
         self.current_thread = threading.Thread(target=self.calib_instance.correct_only, args=(None,))  # .start()
         self.current_thread.start()
-
-    def create_dictionary_dropdown(self, row, column):
-        if hasattr(self, 'dictionary_menu'):
-            self.dictionary_menu.grid_forget()
-        self.dictionary_menu.grid(row=row, column=column)
-
-    def create_video_display_dropdown(self, row, column):
-        if hasattr(self, 'display_video_menu'):
-            self.display_video_menu.grid_forget()
-        self.display_video_menu.grid(row=row, column=column)
 
     def browse_single_video_file(self):
         single_video_file = filedialog.askopenfilename(
@@ -585,14 +652,6 @@ class CalibrationApp:
             self.on_generate_pattern_click()
             pass
 
-    def play_video(self):
-        if self.calib_instance is not None:
-            self.calib_instance.play_video()
-
-    def pause_video(self):
-        if self.calib_instance is not None:
-            self.calib_instance.pause_video()
-
     def insert_status_text(self, text, log_level='INFO'):
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -645,33 +704,6 @@ class CalibrationApp:
     def stop_animation(self):
         self.animation_stop = True
         self.current_animation_id = None
-
-    def update_gui(self):
-        try:
-            while True:
-                current_status, log_level = self.status_queue.get_nowait()
-                if log_level == "CORRECTED" or log_level == 'CC-done':
-                    display_video_side_side = messagebox.askyesno("Display Corrected Video(s)",
-                                                                  "Would you like to display the corrected videos?")
-                    if display_video_side_side and self.calib_instance:
-                        self.calib_instance.display_corrected_video()
-                elif log_level == "-" or log_level in self.LOG_LEVELS:
-                    self.animation_active = False
-                    self.stop_animation()
-                elif log_level == "update-treeview":
-                    for item in self.tree.get_children():
-                        self.tree.delete(item)
-                    print(f'CURRENT STATUS: {current_status}')
-                    for old_video, corrected_vid_details in current_status.items():
-                        old_video_name = os.path.basename(old_video).split('.')[0]
-                        calib_file, new_video = corrected_vid_details[0], corrected_vid_details[1]
-                        self.tree.insert("", tk.END, values=(old_video_name, calib_file, new_video))
-
-                self.insert_status_text(current_status, log_level)
-
-        except queue.Empty:
-            pass
-        self.root.after(10, self.update_gui)
 
 
 if __name__ == '__main__':
