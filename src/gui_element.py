@@ -277,7 +277,7 @@ class CalibrationUI:
     def start_task(self):
         self.save_entries_to_config()
 
-        if self.task_label.cget("text") == "Calibrate Only":
+        """if self.task_label.cget("text") == "Calibrate Only":
             self.on_calibrate_click()
         elif self.task_label.cget("text") == "Correct Only":
             self.on_correct_only_click()
@@ -288,7 +288,7 @@ class CalibrationUI:
         elif self.task_label.cget("text") == 'Generate Calibration Pattern':
             self.on_generate_pattern_click()
             pass
-
+"""
     def save_entries_to_config(self):
         config = configparser.ConfigParser()
         config['Parameters'] = {
