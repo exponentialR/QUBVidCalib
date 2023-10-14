@@ -11,6 +11,8 @@ from utils import open_web_page
 
 class CalibrationUI:
     def __init__(self, root, status_queue, calib_instance):
+        self.current_animation_id = None
+        self.animation_active = None
         self.root = root
         self.container = tk.Frame(self.root)
         self.container.pack(side="top", fill="both", expand=True)
@@ -90,7 +92,13 @@ class CalibrationUI:
         # Initialize variables for Calibrations
         self.create_buttons()
         self.LOG_LEVELS = ['INFO', 'DEBUG', 'ERROR', 'WARNING', 'CORRECTED', 'CC-done']
-
+        self.animated_text = ""
+        self.animation_stop = False
+        self.tree = ttk.Treeview(self.status_frame, columns=("Old Video", "Calibration File", "New Video"))
+        self.tree.heading("#1", text="Old Video")
+        self.tree.heading("#2", text="Calibration File")
+        self.tree.heading("#3", text="New Video")
+        self.tree.pack(side="bottom", fill="both", expand=True)
         self.calib_instance = calib_instance
 
     def setup_main_window(self):
@@ -244,6 +252,10 @@ class CalibrationUI:
         # Your code to populate form with parameters
         pass
 
+    def stop_animation(self):
+        self.animation_stop = True
+        self.current_animation_id = None
+
     def update_pattern_form(self, *args):
         pattern_type = self.pattern_type_var.get()
         if pattern_type == 'Charuco':
@@ -274,21 +286,6 @@ class CalibrationUI:
                 if current_row >= start_row:
                     child.grid(row=current_row + shift_amount)
 
-    def start_task(self):
-        self.save_entries_to_config()
-
-        """if self.task_label.cget("text") == "Calibrate Only":
-            self.on_calibrate_click()
-        elif self.task_label.cget("text") == "Correct Only":
-            self.on_correct_only_click()
-        elif self.task_label.cget('text') == 'Self-Calibrate & Correct':
-            self.on_self_calibrate_correct_click()
-        elif self.task_label.cget("text") == 'Single Calib and Multiple Video Correction':
-            self.on_calibrate_correct_click()
-        elif self.task_label.cget("text") == 'Generate Calibration Pattern':
-            self.on_generate_pattern_click()
-            pass
-"""
     def save_entries_to_config(self):
         config = configparser.ConfigParser()
         config['Parameters'] = {
@@ -305,7 +302,7 @@ class CalibrationUI:
             'Dictionary': self.dictionary_var.get(),
             'Display Video': self.display_video_var.get()
         }
-        with open('settings.ini', 'w') as configfile:
+        with open('../settings.ini', 'w') as configfile:
             config.write(configfile)
 
     def load_entries_from_config(self):
@@ -324,4 +321,38 @@ class CalibrationUI:
             self.save_every_n_frames_var.set(config['Parameters'].get('Save Every N Frames', ''))
             self.dictionary_var.set(config['Parameters'].get('Dictionary', ''))
             self.display_video_var.set(config['Parameters'].get('Display Video', ''))
+
+    def insert_status_text(self, text, log_level='INFO'):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        current_scroll_position = self.status_text.yview()[1]
+
+        if log_level in self.LOG_LEVELS:  # For non-empty log levels
+            full_text = f'\n[{timestamp}] [{log_level}] - {text}\n'
+            self.status_text.insert(tk.END, full_text, log_level)
+        elif log_level == "-" or log_level in self.LOG_LEVELS:
+            full_text = f'{text}\n'
+            self.stop_animation()
+            self.animation_stop = True
+            self.status_text.insert(tk.END, full_text, log_level)
+        elif log_level == 'anime':
+            if self.animated_text_index is not None:
+                self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
+            full_text = f'{text}\n'
+            self.status_text.insert(tk.END, full_text)
+
+            self.animated_text_index = self.status_text.index(tk.END)  # Store the index of the animated text
+            self.animated_text_index = f"{float(self.animated_text_index) - 1.0} linestart"  # Go to the beginning of the line
+            self.animation_stop = False  # Reset the stop flag
+            self.start_animation(text)  # Start the animation
+        elif log_level == 'stop-anime':
+            self.animation_stop = True
+        else:  # For empty log level
+            pass
+
+        new_scroll_position = self.status_text.yview()[1]
+
+        # Only automatically scroll to the end if the user was already at the bottom
+        if current_scroll_position == 1.0 or new_scroll_position == 1.0:
+            self.status_text.see(tk.END)
 

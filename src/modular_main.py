@@ -3,7 +3,9 @@ import uuid
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import configparser
-from tkinter import Canvas
+from tkinter import Canvas, font
+# from tkinter import font
+
 import threading
 import queue
 from datetime import datetime
@@ -20,15 +22,15 @@ def open_web_page(event):
 
 class CalibrationApp:
     def __init__(self, root_):
-        self.copyright_label = None
-        self.footer_frame = None
-        self.animated_text_index = None
         self.status_queue = queue.Queue()
         self.root = root_
         self.root.geometry("1080x920")
         self.root.title('CalibraVision')
         self.root.configure(bg='black')
         self.create_footer(root_)
+        self.copyright_label = None
+        self.footer_frame = None
+        self.animated_text_index = None
 
         # Initialize variables for Calibrations
         self.proj_repo_var = tk.StringVar()
@@ -63,8 +65,8 @@ class CalibrationApp:
             ("Project Repository:", self.proj_repo_var, self.browse_proj_repo, None),
             ("Project Name:", self.project_name_var, None, None),
             ("Video Files (for correction):", self.video_files_var, self.browse_video_files, None),
-            ("SquaresX:", self.squaresX_var, None, None),
-            ("SquaresY:", self.squaresY_var, None, None),
+            ("SquaresX  (Columns):", self.squaresX_var, None, None),
+            ("SquaresY (Rows) :", self.squaresY_var, None, None),
             ("SquareLength:", self.squareLength_var, None, None),
             ("MarkerLength:", self.markerLength_var, None, None),
             ("Frame Interval:", self.frame_interval_calib_var, None, None),
@@ -76,8 +78,8 @@ class CalibrationApp:
         self.common_pattern_params = [('Calibration Pattern Type:', self.pattern_type_var, self.create_dropdown, None),
                                       ('Pattern Location (Where to save):', self.proj_repo_var, self.browse_proj_repo,
                                        None),
-                                      ('Number of Rows:', self.rows_var, None, None),
-                                      ('Number of Columns:', self.columns_var, None, None),
+                                      ('Number of Rows (Y):', self.rows_var, None, None),
+                                      ('Number of Columns (X) :', self.columns_var, None, None),
                                       ('Square Size/Checker Width (mm):', self.checker_width_var, None, None),
                                       ('Length of Side Margin (mm):', self.margin_var, None, None),
                                       ('Dots per Inch (dpi for printing):', self.dpi_var, None, None), ]
@@ -86,8 +88,8 @@ class CalibrationApp:
                                          ('Marker/Square Ratio:', self.marker_et_percentage_var, None, None),
                                          ]
         self.checker_exclusive_params = []
-
-        # Initialize frames
+        self.status_queue = queue.Queue()
+        self.root = root_
         self.container = tk.Frame(self.root)
         self.container.pack(side="top", fill="both", expand=True)
         self.container.grid_rowconfigure(0, weight=1)
@@ -96,10 +98,14 @@ class CalibrationApp:
         self.start_frame = ttk.Frame(self.container, style='My.TFrame')
         self.input_frame = ttk.Frame(self.container, style='My.TFrame')
         self.status_frame = ttk.Frame(self.container, style='My.TFrame')
+        self.start_task_button = ttk.Button(self.input_frame, text="Start Task", command=self.start_task)
+        self.start_task_button.grid(row=len(self.params) + 3, column=1, padx=5, pady=5)
         self.pattern_type_menu = ttk.OptionMenu(self.input_frame, self.pattern_type_var, self.pattern_type_options[0],
                                                 *self.pattern_type_options)
         self.dictionary_menu = ttk.OptionMenu(self.input_frame, self.dictionary_var, self.dictionary_options[0],
                                               *self.dictionary_options)
+        # Initialize frames
+
         self.display_video_menu = ttk.OptionMenu(self.input_frame, self.display_video_var,
                                                  self.display_video_options[0], *self.display_video_options)
 
@@ -163,8 +169,7 @@ class CalibrationApp:
             row=9, column=0, pady=10, sticky='ew', padx=20)
 
         # Start Task button
-        self.start_task_button = ttk.Button(self.input_frame, text="Start Task", command=self.start_task)
-        self.start_task_button.grid(row=len(self.params) + 3, column=1, padx=5, pady=5)
+
         ttk.Button(self.input_frame, text="Back", command=lambda: self.show_frame(self.start_frame)).grid(
             row=len(self.params) + 4,
             column=1,
@@ -176,11 +181,19 @@ class CalibrationApp:
         self.animated_text_label = tk.Label(self.status_frame, bg='#ADD8E6', fg='#000000')
         self.animated_text_label.pack()
         self.current_animation_id = None
-        self.tree = ttk.Treeview(self.status_frame, columns=("Old Video", "Calibration File", "New Video"))
+
+        treeview_font = font.nametofont("TkDefaultFont").copy()
+        treeview_font.config(size=8, family='Courier New')
+
+        self.style.configure("Treeview", font=treeview_font)
+        self.tree = ttk.Treeview(self.status_frame,
+                                 columns=("Project Repository", "Old Video", "Calibration File", "New Video"))
+        self.tree.heading('#0', text="Project Repository")
         self.tree.heading("#1", text="Old Video")
         self.tree.heading("#2", text="Calibration File")
         self.tree.heading("#3", text="New Video")
         self.tree.pack(side="bottom", fill="both", expand=True)
+        self.load_entries_from_config()
 
         self.calib_instance = None
         self.current_thread = None
@@ -217,13 +230,29 @@ class CalibrationApp:
         self.show_frame(self.start_frame)
         self.tree.pack(side="bottom", fill="both", expand=True)
 
-        self.load_entries_from_config()
         self.root.after(10, self.update_gui)
         self.root.mainloop()
 
+    def update_tree_view_columns(self, task):
+        if task == 'Generate Calibration Pattern':
+            self.tree['columns'] = (
+                "Project Repository", "Rec. Print Size", "CalibPattern Path", "Calib Params")
+            self.tree.heading("#0", text="Project Repository")
+            self.tree.heading("#1", text="Rec. Print Size")
+            self.tree.heading("#2", text="CalibPattern Path")
+            self.tree.heading("#3", text="Calib Params")
+        else:
+            self.tree['columns'] = ("Project Repository", "Old Video", "Calibration File", "New Video")
+            self.tree.heading("#0", text="Project Repository")
+            self.tree.heading("#1", text="Old Video")
+            self.tree.heading("#2", text="Calibration File")
+            self.tree.heading("#3", text="New Video")
+
     def show_frame(self, frame, text=None):
         self.task_label.config(text=text)
+        self.load_entries_from_config()
         self.populate_form_based_on_task(text)
+        self.update_tree_view_columns(text)
         frame.tkraise()
 
     def update_gui(self):
@@ -246,9 +275,30 @@ class CalibrationApp:
                         calib_file, new_video = corrected_vid_details[0], corrected_vid_details[1]
                         self.tree.insert("", tk.END, values=(old_video_name, calib_file, new_video))
 
-                elif log_level == 'display-pattern':
-                    """"""
+                elif log_level == 'display-pattern-text':
+                    for item in self.tree.get_children():
+                        self.tree.delete(item)
+                    calibration_parameters = [current_status['Square Size'], f"RowsxColumns: {current_status['Rows']}x{current_status['Columns']}"]
+                    # Insert main item
+                    self.tree.insert("", tk.END,
+                                     values=(current_status['Project Repository'],
+                                             current_status['Rec. Print Size'],
+                                             current_status['Pattern Name'],
+                                             calibration_parameters))
 
+                    # Insert parent for calibration parameters at the end
+                    # self.tree.insert("", tk.END, values=("", "", "", ""))
+
+                    # calibration_parameters = {
+                    #     "Pattern Type": current_status['Pattern Type'],
+                    #     "Rows": current_status['Rows'],
+                    #     "Columns": current_status['Columns'],
+                    #     "Square Size": f"{current_status['Square Size']}"
+                    # }
+                    #
+                    # # Insert each calibration parameter as a child of the parent item
+                    # for key, value in calibration_parameters.items():
+                    #     self.tree.insert("", tk.END, values=(f"{key}: {value}", "", "", ""))
                 self.insert_status_text(current_status, log_level)
 
         except queue.Empty:
@@ -291,6 +341,36 @@ class CalibrationApp:
                                                    video_frame=self.video_display_frame)
             self.current_thread = threading.Thread(target=self.calib_instance.generate)
             self.current_thread.start()
+
+    def load_entries_from_config(self):
+        config = configparser.ConfigParser()
+        if self.task_label.cget("text") == 'Generate Calibration Pattern':
+            config.read('settings-Pattern.ini')
+            if 'Parameters-Pattern' in config:
+                self.pattern_type_var.set(config['Parameters-Pattern'].get('Calibration Pattern Type', ''))
+                self.proj_repo_var.set(config['Parameters-Pattern'].get('Pattern Location (Where to save)', ))
+                self.rows_var.set(config['Parameters-Pattern'].get('Number of Rows (Y)', ''))
+                self.columns_var.set(config['Parameters-Pattern'].get('Number of Columns (X)', ''))
+                self.checker_width_var.set(config['Parameters-Pattern'].get('Square Size/Checker Width (mm)', ''))
+                self.margin_var.set(config['Parameters-Pattern'].get('Length of Side Margin (mm)', ''))
+                self.dpi_var.set(config['Parameters-Pattern'].get('Dots per Inch (dpi for printing)', ''))
+                self.dictionary_var.set(config['Parameters-Pattern'].get('Dictionary', '')),
+                self.marker_et_percentage_var.set(config['Parameters-Pattern'].get('Marker/Square Ratio', ''))
+
+        else:
+            if 'Parameters-Calib' in config:
+                config.read('settings-Calib.ini')
+                self.dictionary_var.set(config['Parameters-Calib'].get('Dictionary', ''))
+                self.proj_repo_var.set(config['Parameters-Calib'].get('Project Repository', ''))
+                self.project_name_var.set(config['Parameters-Calib'].get('Project Name', ''))
+                self.single_video_file_var.set(config['Parameters-Calib'].get('Single Video Calib', ''))
+                self.video_files_var.set(config['Parameters-Calib'].get('Video Files', ''))
+                self.squaresX_var.set(config['Parameters-Calib'].get('SquareX', ''))
+                self.squaresY_var.set(config['Parameters-Calib'].get('SquareY', ''))
+                self.squareLength_var.set(config['Parameters-Calib'].get('SquareLength', ''))
+                self.markerLength_var.set(config['Parameters-Calib'].get('MarkerLength', ''))
+                self.frame_interval_calib_var.set(config['Parameters-Calib'].get('Frame Interval', ''))
+                self.save_every_n_frames_var.set(config['Parameters-Calib'].get('Save Every N Frames', ''))
 
     def populate_pattern_form(self, exclusive_params):
         all_params = self.common_pattern_params + exclusive_params
@@ -336,9 +416,8 @@ class CalibrationApp:
                 if cmd:
                     ttk.Button(self.input_frame, text="Browse", command=cmd).grid(row=i + 1, column=2)
 
-        # Add the Start Task button
         self.start_task_button.grid(row=n_rows + 1, column=1, padx=5, pady=5)
-        # Add a new Back button just for this frame
+
         ttk.Button(self.input_frame, text="Back", command=lambda: self.show_frame(self.start_frame)).grid(
             row=n_rows + 2, column=1, padx=5, pady=5)
 
@@ -595,7 +674,7 @@ class CalibrationApp:
 
     def save_entries_to_config(self):
         config = configparser.ConfigParser()
-        config['Parameters'] = {
+        Calib_Param = {
             'Project Repository': self.proj_repo_var.get(),
             'Project Name': self.project_name_var.get(),
             'Single Video Calib': self.single_video_file_var.get(),
@@ -609,25 +688,25 @@ class CalibrationApp:
             'Dictionary': self.dictionary_var.get(),
             'Display Video': self.display_video_var.get()
         }
-        with open('settings.ini', 'w') as configfile:
-            config.write(configfile)
+        Pattern_Param = {
+            'Calibration Pattern Type': self.pattern_type_var.get(),
+            'Pattern Location (Where to save)': self.proj_repo_var.get(),
+            'Number of Rows (Y)': self.rows_var.get(),
+            'Number of Columns (X)': self.columns_var.get(),
+            'Square Size/Checker Width (mm)': self.checker_width_var.get(),
+            'Length of Side Margin (mm)': self.margin_var.get(),
+            'Dots per Inch (dpi for printing)': self.dpi_var.get(),
+            'Dictionary': self.dictionary_var.get(),
+            'Marker/Square Ratio': self.marker_et_percentage_var.get()}
 
-    def load_entries_from_config(self):
-        config = configparser.ConfigParser()
-        config.read('settings.ini')
-        if 'Parameters' in config:
-            self.proj_repo_var.set(config['Parameters'].get('Project Repository', ''))
-            self.project_name_var.set(config['Parameters'].get('Project Name', ''))
-            self.single_video_file_var.set(config['Parameters'].get('Single Video Calib', ''))
-            self.video_files_var.set(config['Parameters'].get('Video Files', ''))
-            self.squaresX_var.set(config['Parameters'].get('SquareX', ''))
-            self.squaresY_var.set(config['Parameters'].get('SquareY', ''))
-            self.squareLength_var.set(config['Parameters'].get('SquareLength', ''))
-            self.markerLength_var.set(config['Parameters'].get('MarkerLength', ''))
-            self.frame_interval_calib_var.set(config['Parameters'].get('Frame Interval', ''))
-            self.save_every_n_frames_var.set(config['Parameters'].get('Save Every N Frames', ''))
-            self.dictionary_var.set(config['Parameters'].get('Dictionary', ''))
-            self.display_video_var.set(config['Parameters'].get('Display Video', ''))
+        if self.task_label.cget("text") == 'Generate Calibration Pattern':
+            config['Parameters-Pattern'] = Pattern_Param
+            with open('settings-Pattern.ini', 'w') as configfile:
+                config.write(configfile)
+        else:
+            config['Parameters-Calib'] = Calib_Param
+            with open('settings-Calib.ini', 'w') as configfile:
+                config.write(configfile)
 
     def shift_down_widgets(self, start_row, shift_amount):
         for child in self.input_frame.winfo_children():
@@ -639,7 +718,6 @@ class CalibrationApp:
 
     def start_task(self):
         self.save_entries_to_config()
-
         if self.task_label.cget("text") == "Calibrate Only":
             self.on_calibrate_click()
         elif self.task_label.cget("text") == "Correct Only":

@@ -34,7 +34,7 @@ def save_entries_to_config():
         'Dictionary': dictionary_var.get(),
         'Display Video': display_video_var.get()
     }
-    with open('settings.ini', 'w') as configfile:
+    with open('../settings.ini', 'w') as configfile:
         config.write(configfile)
 
 

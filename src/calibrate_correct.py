@@ -98,10 +98,6 @@ class CalibrateCorrect:
         self.pause_button = Button(control_frame, text="Pause", command=self.pause)
         self.pause_button.pack(side="left")
 
-        # Add Slider
-        self.slider = Scale(control_frame, from_=0, to=100, orient=HORIZONTAL)
-        self.slider.pack(side="left")
-
     def play(self):
         self.play_video = True
 
@@ -152,8 +148,6 @@ class CalibrateCorrect:
             image=Image.fromarray(cv2.cvtColor(concat_frame, cv2.COLOR_BGR2RGB)))
 
         self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
-        current_frame_number = int(self.cap_orig.get(cv2.CAP_PROP_POS_FRAMES))
-        # self.slider.set(current_frame_number)
 
         # Schedule the next frame
         self.video_frame.after(10, self.display_corrected_video)

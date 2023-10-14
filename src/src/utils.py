@@ -1,5 +1,5 @@
 import webbrowser
-from src.gui_element import GUI_ELEMENT
+from src.deprecated.gui_element import GUI_ELEMENT
 
 def open_web_page(event):
     webbrowser.open('http://github.com/exponentialR')

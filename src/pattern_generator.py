@@ -89,8 +89,7 @@ class PatternGenerator:
         # Calculate image dimensions
         width_px = int((self.board_width / 25.4 + 2 * self.margin / 25.4) * self.dpi)
         height_px = int((self.board_height / 25.4 + 2 * self.margin / 25.4) * self.dpi)
-        print(f'Height of PX : {height_px}')
-        print(f'Width of PX: {width_px}')
+
         # Calculate the pixel value of the margin
         margin_px = int((self.margin / 25.4) * self.dpi)
 
@@ -142,6 +141,7 @@ class PatternGenerator:
         return pattern_image
 
     def export_to_pdf(self, image):
+        print('We are exporting PDF')
         self.status_queue.put(('SAVING TO PDF', 'anime'))
         # Create a Matplotlib figure and axis
         fig, ax = plt.subplots(figsize=(self.board_width / 25.4 + 2 * self.margin / 25.4,
@@ -162,24 +162,30 @@ class PatternGenerator:
         fontsize = int(12 * font_scale)
 
         # Add paper dimensions in mm to the annotation
-        annotations = [
-            f"Recommended Paper Size: {recommended_paper_size} ({paper_width_mm:.2f} mm x {paper_height_mm:.2f} mm)",
-            f"Pattern Type: {self.pattern_type}",
-            f"Rows: {self.pattern_size[0]}",
-            f"Columns: {self.pattern_size[1]}",
-            f"Square Size: {self.square_size} mm"
-        ]
-        if self.pattern_type.lower() == 'charuco':
-            annotations.append(f"ArUco Dictionary: {self.dictionary}")
+        annotations_dict = {
+            "Rec. Print Size": f"{recommended_paper_size} ({paper_width_mm:.2f} mm x {paper_height_mm:.2f} mm)",
+            "Pattern Type": self.pattern_type,
+            "Rows": str(self.pattern_size[0]),
+            "Columns": str(self.pattern_size[1]),
+            "Square Size": f"{self.square_size} mm"
+        }
 
-        annotation_text = " | ".join(annotations)
+        if self.pattern_type.lower() == 'charuco':
+            annotations_dict["ArUco Dictionary"] = self.dictionary
+            annotations_dict["Marker Size"] = self.marker_length
+
+        annotation_text = " | ".join(f"{key}: {value}" for key, value in annotations_dict.items())
+
+        self.status_queue.put(('-------------', 'stop-anime'))
+        # self.status_queue.put
 
         ax.annotate(annotation_text,
                     xy=(0.5, 1.02),
                     xycoords='axes fraction',
                     fontsize=fontsize,
                     ha='center')
-
+        annotations_dict['Project Repository'], annotations_dict['Pattern Name']= self.project_dir, self.pattern_name
+        self.status_queue.put((annotations_dict, 'display-pattern-text'))
         # Save as PDF
         pdf_path = f"{self.project_dir}/{self.pattern_type.title()}-{self.pattern_name.strftime('%Y%m%d_%H%M%S')}.pdf"
         plt.savefig(pdf_path, bbox_inches='tight', pad_inches=0, dpi=self.dpi)
@@ -230,7 +236,7 @@ class PatternGenerator:
         # self.status_queue.put(())
 
     def recommend_paper_size(self):
-        self.status_queue.put(('GETTING RECOMMENDED PAPER SIZE', 'INFO'))
+        self.status_queue.put(('GETTING RECOMMENDED PAPER SIZE', 'anime'))
         total_width_mm = self.board_width + 2 * self.margin
         total_height_mm = self.board_height + 2 * self.margin
 
@@ -246,8 +252,8 @@ class PatternGenerator:
 
             if (total_width_mm <= size_width_mm and total_height_mm <= size_height_mm) or \
                     (total_width_mm <= size_height_mm and total_height_mm <= size_width_mm):  # Check both orientations
-                print(f'SIZE WIDTH MM: {size_width_mm}')
-                print(f'SIZE HEIGHT MM : {size_height_mm}')
+                self.status_queue.put((f'Recommended Print Size: {size_width_mm}x{size_height_mm} mm', 'stop-anime'))
+
                 return size_name  # Return the first suitable size found
 
         return 'Custom Size'  # Return 'Custom Size' if no suitable size was found
