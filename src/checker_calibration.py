@@ -62,7 +62,6 @@ class CalibrationApp:
         self.dictionary_options = DICTIONARY
 
         self.params = [
-            ("Calibration Pattern Type:", self.pattern_type_var, self.create_dropdown, None),
             ("Project Repository:", self.proj_repo_var, self.browse_proj_repo, None),
             ("Project Name:", self.project_name_var, None, None),
             ("Video Files (for correction):", self.video_files_var, self.browse_video_files, None),
@@ -84,18 +83,6 @@ class CalibrationApp:
                                       ('Square Size/Checker Width (mm):', self.checker_width_var, None, None),
                                       ('Length of Side Margin (mm):', self.margin_var, None, None),
                                       ('Dots per Inch (dpi for printing):', self.dpi_var, None, None), ]
-        self.common_calib_params = [
-            ("Calibration Pattern Type:", self.pattern_type_var, self.create_dropdown, None),
-            ("Project Repository:", self.proj_repo_var, self.browse_proj_repo, None),
-            ("Project Name:", self.project_name_var, None, None),
-            ("Video Files (for correction):", self.video_files_var, self.browse_video_files, None),
-            ("SquaresX  (Columns):", self.squaresX_var, None, None),
-            ("SquaresY (Rows) :", self.squaresY_var, None, None),
-            ("SquareLength:", self.squareLength_var, None, None),
-            ("Frame Interval:", self.frame_interval_calib_var, None, None),
-            ("Save Every N Frames:", self.save_every_n_frames_var, None, None),
-            ('Display Video During Calibration?:', self.display_video_var, self.create_dropdown, None)
-        ]
 
         self.charuco_exclusive_params = [('Dictionary:', self.dictionary_var, self.create_dropdown, None),
                                          ('Marker/Square Ratio:', self.marker_et_percentage_var, None, None),
@@ -263,10 +250,7 @@ class CalibrationApp:
     def show_frame(self, frame, text=None):
         self.task_label.config(text=text)
         self.load_entries_from_config()
-        if text == 'Single Calib and Multiple Video Correction' or text == 'Calibrate Only':
-            self.populate_form_calib()
-        else:
-            self.populate_form_based_on_task(text)
+        self.populate_form_based_on_task(text)
         self.update_tree_view_columns(text)
         frame.tkraise()
 
@@ -327,52 +311,6 @@ class CalibrationApp:
         else:
             self.populate_pattern_form(self.checker_exclusive_params)
 
-    def populate_form_calib(self):
-        pattern_type = self.pattern_type_var.get()
-        if pattern_type == 'Charuco':
-            self.populate_form_with_params(self.common_calib_params+self.charuco_exclusive_params)
-        else:
-            self.populate_form_with_params(self.common_calib_params + self.checker_exclusive_params)
-
-    def on_calibrate_correct_click(self):
-        self.show_frame(self.status_frame, 'Single Calib and Multiple Video Correction')
-        pattern_type = self.pattern_type_var.get()
-        if pattern_type.lower() == 'charuco':
-            self.calib_instance = CalibrateCorrect(pattern_type=self.pattern_type_var.get(),
-                                                   proj_repo=self.proj_repo_var.get(),
-                                                   projectname=self.project_name_var.get(),
-                                                   video_files=self.video_files_var.get().split(';'),
-                                                   squaresX=int(self.squaresX_var.get()),
-                                                   squaresY=int(self.squaresY_var.get()),
-                                                   square_size=int(self.squareLength_var.get()),
-                                                   markerLength=int(self.markerLength_var.get()),
-                                                   dictionary=self.dictionary_var.get(),
-                                                   frame_interval_calib=int(self.frame_interval_calib_var.get()),
-                                                   display=str(self.display_video_var.get()),
-                                                   video_frame=self.video_display_frame,
-                                                   save_every_n_frames=int(self.save_every_n_frames_var.get()),
-                                                   status_queue=self.status_queue)
-            self.current_thread = threading.Thread(target=self.calib_instance.singleCalibMultiCorrect,
-                                                   args=(self.single_video_file_var.get(),))
-            self.current_thread.start()
-
-        elif pattern_type.lower() == 'checker':
-            self.calib_instance = CalibrateCorrect(pattern_type=self.pattern_type_var.get(),
-                                                   proj_repo=self.proj_repo_var.get(),
-                                                   projectname=self.project_name_var.get(),
-                                                   video_files=self.video_files_var.get().split(';'),
-                                                   squaresX=int(self.squaresX_var.get()),
-                                                   squaresY=int(self.squaresY_var.get()),
-                                                   square_size=int(self.squareLength_var.get()),
-                                                   frame_interval_calib=int(self.frame_interval_calib_var.get()),
-                                                   display=str(self.display_video_var.get()),
-                                                   video_frame=self.video_display_frame,
-                                                   save_every_n_frames=int(self.save_every_n_frames_var.get()),
-                                                   status_queue=self.status_queue)
-        self.current_thread = threading.Thread(target=self.calib_instance.singleCalibMultiCorrect,
-                                               args=(self.single_video_file_var.get(),))
-        self.current_thread.start()
-
     def on_generate_pattern_click(self):
         self.show_frame(self.status_frame, 'Generate Calibration Pattern')
         pattern_type = self.pattern_type_var.get()
@@ -421,7 +359,6 @@ class CalibrationApp:
         else:
             if 'Parameters-Calib' in config:
                 config.read('settings-Calib.ini')
-                self.pattern_type_var.set(config['Parameters-Calib'].get('Calibration Pattern Type', ''))
                 self.dictionary_var.set(config['Parameters-Calib'].get('Dictionary', ''))
                 self.proj_repo_var.set(config['Parameters-Calib'].get('Project Repository', ''))
                 self.project_name_var.set(config['Parameters-Calib'].get('Project Name', ''))
@@ -434,13 +371,8 @@ class CalibrationApp:
                 self.frame_interval_calib_var.set(config['Parameters-Calib'].get('Frame Interval', ''))
                 self.save_every_n_frames_var.set(config['Parameters-Calib'].get('Save Every N Frames', ''))
 
-    def populate_pattern_form(self, exclusive_params, task='pattern'):
-        if task.lower() == 'pattern':
-            all_params = self.common_pattern_params + exclusive_params
-        elif task.lower() == 'calib':
-            all_params = self.common_calib_params + exclusive_params
-        else:
-            raise Exception
+    def populate_pattern_form(self, exclusive_params):
+        all_params = self.common_pattern_params + exclusive_params
         self.populate_form_with_params(all_params)
 
     def create_dropdown(self, row, column, menu_attribute):
@@ -505,11 +437,6 @@ class CalibrationApp:
 
         elif task == "Single Calib and Multiple Video Correction":
             params_copy.append(["Single Video File:", self.single_video_file_var, self.browse_single_video_file, None])
-            pattern_type = self.pattern_type_var.get()
-            # if pattern_type == 'Charuco':
-            #     self.populate_pattern_form(self.charuco_exclusive_params)
-            # else:
-            #     self.populate_pattern_form(self.checker_exclusive_params)
             self.populate_form_with_params(params_copy)
             self.shift_down_widgets(start_row=4, shift_amount=1)
 
@@ -534,8 +461,24 @@ class CalibrationApp:
         self.current_thread = threading.Thread(target=self.calib_instance.self_calibrate_correct)  # .start()
         self.current_thread.start()
 
+    def on_calibrate_correct_click(self):
+        self.show_frame(self.status_frame, 'Single Calib and Multiple Video Correction')
+        self.calib_instance = CalibrateCorrect(self.proj_repo_var.get(), self.project_name_var.get(),
+                                               self.video_files_var.get().split(';'), int(self.squaresX_var.get()),
+                                               int(self.squaresY_var.get()), int(self.squareLength_var.get()),
+                                               int(self.markerLength_var.get()), self.dictionary_var.get(),
+                                               int(self.frame_interval_calib_var.get()),
+                                               display=str(self.display_video_var.get()),
+                                               video_frame=self.video_display_frame,
+                                               save_every_n_frames=int(self.save_every_n_frames_var.get()),
+                                               status_queue=self.status_queue)
+        self.current_thread = threading.Thread(target=self.calib_instance.singleCalibMultiCorrect,
+                                               args=(self.single_video_file_var.get(),))
+        self.current_thread.start()
+
     def on_calibrate_click(self):
         self.show_frame(self.status_frame, "Calibrate Only")
+
         self.calib_instance = CalibrateCorrect(self.proj_repo_var.get(), self.project_name_var.get(),
                                                self.video_files_var.get().split(';'), int(self.squaresX_var.get()),
                                                int(self.squaresY_var.get()), int(self.squareLength_var.get()),

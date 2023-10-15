@@ -419,7 +419,6 @@ class CalibrationApp:
 
     def start_task(self):
         self.save_entries_to_config()
-
         if self.task_label.cget("text") == "Calibrate Only":
             self.on_calibrate_click()
         elif self.task_label.cget("text") == "Correct Only":
@@ -458,7 +457,7 @@ class CalibrationApp:
             self.status_text.insert(tk.END, full_text)
 
             self.animated_text_index = self.status_text.index(tk.END)  # Store the index of the animated text
-            self.animated_text_index = f"{float(self.animated_text_index) - 1.0} linestart"  # Go to the beginning of the line
+            self.animated_text_index = f"{float(self.animated_text_index) - 1.0} linestart"
             self.animation_stop = False  # Reset the stop flag
             self.start_animation(text)  # Start the animation
         elif log_level == 'stop-anime':
@@ -477,14 +476,6 @@ class CalibrationApp:
             new_animation_id = uuid.uuid4()
             self.current_animation_id = new_animation_id
             self._start_animation_helper(initial_text, new_animation_id)
-            # num_dots = int(datetime.now().timestamp()) % 5
-            # animated_text = f"{initial_text} {'|||' * num_dots}"
-            #
-            # # Update the text at the animated_text_index
-            # self.status_text.delete(self.animated_text_index, f"{self.animated_text_index} lineend")
-            # self.status_text.insert(self.animated_text_index, animated_text)
-            #
-            # self.root.after(500, lambda: self.start_animation(initial_text))
 
     def _start_animation_helper(self, initial_text, animation_id):
         if self.current_animation_id == animation_id:
@@ -528,41 +519,29 @@ class CalibrationApp:
 
     def on_self_calibrate_correct_click(self):
         self.show_frame(self.status_frame, "Self-Calibrate & Correct")
-        self.calib_instance = CalibrateCorrect(
-            self.proj_repo_var.get(),
-            self.project_name_var.get(),
-            self.video_files_var.get().split(';'),  # Assuming files are separated by semicolons
-            int(self.squaresX_var.get()),
-            int(self.squaresY_var.get()),
-            int(self.squareLength_var.get()),
-            int(self.markerLength_var.get()),
-            self.dictionary_var.get(),
-            int(self.frame_interval_calib_var.get()),
-            video_frame=self.video_display_frame,
-            save_every_n_frames=int(self.save_every_n_frames_var.get()),
-            display=str(self.display_video_var.get()),
-            status_queue=self.status_queue
-        )
+        self.calib_instance = CalibrateCorrect(self.proj_repo_var.get(), self.project_name_var.get(),
+                                               self.video_files_var.get().split(';'), int(self.squaresX_var.get()),
+                                               int(self.squaresY_var.get()), int(self.squareLength_var.get()),
+                                               int(self.markerLength_var.get()), self.dictionary_var.get(),
+                                               int(self.frame_interval_calib_var.get()),
+                                               display=str(self.display_video_var.get()),
+                                               video_frame=self.video_display_frame,
+                                               save_every_n_frames=int(self.save_every_n_frames_var.get()),
+                                               status_queue=self.status_queue)
         self.current_thread = threading.Thread(target=self.calib_instance.self_calibrate_correct)  # .start()
         self.current_thread.start()
 
     def on_calibrate_correct_click(self):
         self.show_frame(self.status_frame, 'Single Calib and Multiple Video Correction')
-        self.calib_instance = CalibrateCorrect(
-            self.proj_repo_var.get(),
-            self.project_name_var.get(),
-            self.video_files_var.get().split(';'),  # Assuming files are separated by semicolons
-            int(self.squaresX_var.get()),
-            int(self.squaresY_var.get()),
-            int(self.squareLength_var.get()),
-            int(self.markerLength_var.get()),
-            self.dictionary_var.get(),
-            int(self.frame_interval_calib_var.get()),
-            video_frame=self.video_display_frame,
-            save_every_n_frames=int(self.save_every_n_frames_var.get()),
-            display=str(self.display_video_var.get()),
-            status_queue=self.status_queue
-        )
+        self.calib_instance = CalibrateCorrect(self.proj_repo_var.get(), self.project_name_var.get(),
+                                               self.video_files_var.get().split(';'), int(self.squaresX_var.get()),
+                                               int(self.squaresY_var.get()), int(self.squareLength_var.get()),
+                                               int(self.markerLength_var.get()), self.dictionary_var.get(),
+                                               int(self.frame_interval_calib_var.get()),
+                                               display=str(self.display_video_var.get()),
+                                               video_frame=self.video_display_frame,
+                                               save_every_n_frames=int(self.save_every_n_frames_var.get()),
+                                               status_queue=self.status_queue)
         self.current_thread = threading.Thread(target=self.calib_instance.singleCalibMultiCorrect,
                                                args=(self.single_video_file_var.get(),))
         self.current_thread.start()
@@ -570,21 +549,19 @@ class CalibrationApp:
     def on_calibrate_click(self):
         self.show_frame(self.status_frame, "Calibrate Only")
 
-        self.calib_instance = CalibrateCorrect(
-            self.proj_repo_var.get(),
-            self.project_name_var.get(),
-            self.video_files_var.get().split(';'),  # Assuming files are separated by semicolons
-            int(self.squaresX_var.get()),
-            int(self.squaresY_var.get()),
-            int(self.squareLength_var.get()),
-            int(self.markerLength_var.get()),
-            self.dictionary_var.get(),
-            int(self.frame_interval_calib_var.get()),
-            video_frame=self.video_display_frame,
-            save_every_n_frames=int(self.save_every_n_frames_var.get()),
-            display=str(self.display_video_var.get()),
-            status_queue=self.status_queue
-        )
+        # def __init__(self, proj_repo, projectname, video_files, squaresX, squaresY, square_size, markerLength,
+        #              dictionary, frame_interval_calib=None, display=None, video_frame=None, save_every_n_frames=None,
+        #              status_queue=None, pattern_type=None)
+
+        self.calib_instance = CalibrateCorrect(self.proj_repo_var.get(), self.project_name_var.get(),
+                                               self.video_files_var.get().split(';'), int(self.squaresX_var.get()),
+                                               int(self.squaresY_var.get()), int(self.squareLength_var.get()),
+                                               int(self.markerLength_var.get()), self.dictionary_var.get(),
+                                               int(self.frame_interval_calib_var.get()),
+                                               display=str(self.display_video_var.get()),
+                                               video_frame=self.video_display_frame,
+                                               save_every_n_frames=int(self.save_every_n_frames_var.get()),
+                                               status_queue=self.status_queue, pattern_type=self.pattern_type_var.get())
         self.current_thread = threading.Thread(target=self.calib_instance.calibrate_only)  # .start()
         self.current_thread.start()
 
@@ -633,21 +610,19 @@ class CalibrationApp:
                 return
 
             merged_dict = dict(zip(video_files, calib_files))
-            self.calib_instance_correct_only = CalibrateCorrect(
-                self.proj_repo_var.get(),
-                self.project_name_var.get(),
-                self.video_files_var.get().split(';'),
-                int(self.squaresX_var.get()),
-                int(self.squaresY_var.get()),
-                int(self.squareLength_var.get()),
-                int(self.markerLength_var.get()),
-                self.dictionary_var.get(),
-                int(self.frame_interval_calib_var.get()),
-                video_frame=self.video_display_frame,
-                save_every_n_frames=int(self.save_every_n_frames_var.get()),
-                display=str(self.display_video_var.get()),
-                status_queue=self.status_queue
-            )
+            self.calib_instance_correct_only = CalibrateCorrect(self.proj_repo_var.get(), self.project_name_var.get(),
+                                                                self.video_files_var.get().split(';'),
+                                                                int(self.squaresX_var.get()),
+                                                                int(self.squaresY_var.get()),
+                                                                int(self.squareLength_var.get()),
+                                                                int(self.markerLength_var.get()),
+                                                                self.dictionary_var.get(),
+                                                                int(self.frame_interval_calib_var.get()),
+                                                                display=str(self.display_video_var.get()),
+                                                                video_frame=self.video_display_frame,
+                                                                save_every_n_frames=int(
+                                                                    self.save_every_n_frames_var.get()),
+                                                                status_queue=self.status_queue)
             self.current_thread = threading.Thread(target=self.calib_instance_correct_only.correct_only,
                                                    args=(merged_dict))  # .start()
             self.current_thread.start()
@@ -658,20 +633,12 @@ class CalibrationApp:
 
     def start_correct_only_task(self):
         self.save_entries_to_config()
-        self.calib_instance = CalibrateCorrect(
-            self.proj_repo_var.get(),
-            self.project_name_var.get(),
-            self.video_files_var.get().split(';'),  # Assuming files are separated by semicolons
-            int(self.squaresX_var.get()),
-            int(self.squaresY_var.get()),
-            int(self.squareLength_var.get()),
-            int(self.markerLength_var.get()),
-            self.dictionary_var.get(),
-            int(self.frame_interval_calib_var.get()),
-            status_queue=self.status_queue,
-            video_frame=self.video_display_frame,
-
-        )
+        self.calib_instance = CalibrateCorrect(self.proj_repo_var.get(), self.project_name_var.get(),
+                                               self.video_files_var.get().split(';'), int(self.squaresX_var.get()),
+                                               int(self.squaresY_var.get()), int(self.squareLength_var.get()),
+                                               int(self.markerLength_var.get()), self.dictionary_var.get(),
+                                               int(self.frame_interval_calib_var.get()),
+                                               video_frame=self.video_display_frame, status_queue=self.status_queue)
         self.show_frame(self.status_frame, "Correct Only")
         self.current_thread = threading.Thread(target=self.calib_instance.correct_only, args=(None,))  # .start()
         self.current_thread.start()

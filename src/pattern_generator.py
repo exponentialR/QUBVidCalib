@@ -65,7 +65,7 @@ class PatternGenerator:
         self.pattern_type = pattern_type
         self.pattern_size = (rows, columns)
         self.square_size = int(checker_width)
-        print(f'SQUARE SIZE: {self.square_size}')
+        # print(f'SQUARE SIZE: {self.square_size}')
         self.board_width = columns * checker_width  # Updated
         self.board_height = rows * checker_width  # Updated
         self.dictionary = dictionary
