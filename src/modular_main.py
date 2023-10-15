@@ -100,6 +100,8 @@ class CalibrationApp:
         self.charuco_exclusive_params = [('Dictionary:', self.dictionary_var, self.create_dropdown, None),
                                          ('Marker/Square Ratio:', self.marker_et_percentage_var, None, None),
                                          ]
+        self.charuco_calib_exclusive = [('Dictionary:', self.dictionary_var, self.create_dropdown, None),
+                                        ("MarkerLength:", self.markerLength_var, None, None), ]
         self.checker_exclusive_params = []
         self.status_queue = queue.Queue()
         self.root = root_
@@ -245,6 +247,116 @@ class CalibrationApp:
         self.root.after(10, self.update_gui)
         self.root.mainloop()
 
+    def update_pattern_form(self, *args):
+        pattern_type = self.pattern_type_var.get()
+        if self.task_label.cget("text") == 'Single Calib and Multiple Video Correction':
+            if pattern_type.lower() == 'charuco':
+                self.populate_pattern_form(self.charuco_exclusive_params, task='calib')
+            else:
+                self.populate_pattern_form(self.checker_exclusive_params, task='calib')
+
+        elif self.task_label.cget('text') == 'Calibrate Only':
+            if pattern_type.lower() == 'charuco':
+                self.populate_pattern_form(self.charuco_exclusive_params, task='calib')
+            else:
+                self.populate_pattern_form(self.charuco_exclusive_params, task='calib')
+        elif self.task_label.cget('text') == 'Generate Calibration Pattern':
+            if pattern_type.lower() == 'charuco':
+                self.populate_pattern_form(self.charuco_exclusive_params)
+            else:
+                self.populate_pattern_form(self.checker_exclusive_params)
+        elif self.task_label.cget("text") == 'Correct Only':
+            if pattern_type.lower() == 'charuco':
+
+    def populate_pattern_form(self, exclusive_params, task='pattern'):
+        if task.lower() == 'pattern':
+            all_params = self.common_pattern_params + exclusive_params
+        elif task.lower() == 'calib':
+            all_params = self.common_calib_params + exclusive_params
+        else:
+            raise Exception
+        self.populate_form_with_params(all_params)
+
+    def populate_form_with_params(self, params):
+        pattern_type = self.pattern_type_var.get()
+        if not hasattr(self, 'task_label'):
+            self.task_label = tk.Label(self.input_frame, text="", font=("Verdana", 18, 'bold'), bg='#ADD8E6',
+                                       fg='#000000')
+
+        for widget in self.input_frame.winfo_children():
+            widget.grid_forget()
+
+        # Then repopulate
+        self.task_label.grid(row=0, column=0, columnspan=3, pady=20, sticky="ew")
+        n_rows = len(params)
+
+        for i, (text, var, cmd, _) in enumerate(params):
+            if not hasattr(self, 'label_style'):
+                self.label_style = {'bg': '#ADD8E6', 'fg': '#000000', 'font': ('Courier New', 12)}
+            label = tk.Label(self.input_frame, text=text, **self.label_style)
+            label.grid(row=i + 1, column=0, sticky="w")
+            if pattern_type.lower() == 'charuco':
+                if text == 'Dictionary:':
+                    cmd(i + 1, 1, 'dictionary_menu')
+                elif text == "Display Video During Calibration?:":
+                    cmd(i + 1, 1, 'display_video_menu')
+                elif text == 'Calibration Pattern Type:':
+                    cmd(i + 1, 1, 'pattern_type_menu')
+
+                else:
+
+                    entry = ttk.Entry(self.input_frame, textvariable=var, width=40)
+                    entry.grid(row=i + 1, column=1)
+
+                    if cmd:
+                        ttk.Button(self.input_frame, text="Browse", command=cmd).grid(row=i + 1, column=2)
+            elif pattern_type.lower() == 'checker':
+                if text == "Display Video During Calibration?:":
+                    cmd(i + 1, 1, 'display_video_menu')
+                elif text == 'Calibration Pattern Type:':
+                    cmd(i + 1, 1, 'pattern_type_menu')
+
+                else:
+
+                    entry = ttk.Entry(self.input_frame, textvariable=var, width=40)
+                    entry.grid(row=i + 1, column=1)
+
+                    if cmd:
+                        ttk.Button(self.input_frame, text="Browse", command=cmd).grid(row=i + 1, column=2)
+
+        self.start_task_button.grid(row=n_rows + 1, column=1, padx=5, pady=5)
+
+        ttk.Button(self.input_frame, text="Back", command=lambda: self.show_frame(self.start_frame)).grid(
+            row=n_rows + 2, column=1, padx=5, pady=5)
+
+    def populate_form_based_on_task(self, task):
+        params_copy = [list(p) for p in self.params]
+
+        if task == "Calibrate Only":
+            for i, param in enumerate(params_copy):
+                if param[0] == "Video Files (for correction):":
+                    param[0] = "Video Files (for calibration):"
+            self.populate_form_with_params(params_copy)
+
+        elif task == "Correct Only":
+            self.populate_form_with_params(params_copy[:7])  # Assuming first 7 are necessary
+
+        elif task == "Self-Calibrate & Correct":
+            self.populate_form_with_params(params_copy)
+
+        elif task == "Single Calib and Multiple Video Correction":
+            params_copy.append(["Single Video File:", self.single_video_file_var, self.browse_single_video_file, None])
+            pattern_type = self.pattern_type_var.get()
+            self.populate_form_with_params(params_copy)
+            self.shift_down_widgets(start_row=4, shift_amount=1)
+
+        elif task == "Generate Calibration Pattern":
+            pattern_type = self.pattern_type_var.get()
+            if pattern_type == 'Charuco':
+                self.populate_pattern_form(self.charuco_exclusive_params)
+            else:
+                self.populate_pattern_form(self.checker_exclusive_params)
+
     def update_tree_view_columns(self, task):
         if task == 'Generate Calibration Pattern':
             self.tree['columns'] = (
@@ -293,7 +405,8 @@ class CalibrationApp:
                 elif log_level == 'display-pattern-text':
                     for item in self.tree.get_children():
                         self.tree.delete(item)
-                    calibration_parameters = [current_status['Square Size'], f"RowsxColumns: {current_status['Rows']}x{current_status['Columns']}"]
+                    calibration_parameters = [current_status['Square Size'],
+                                              f"RowsxColumns: {current_status['Rows']}x{current_status['Columns']}"]
                     # Insert main item
                     self.tree.insert("", tk.END,
                                      values=(current_status['Project Repository'],
@@ -320,17 +433,10 @@ class CalibrationApp:
             pass
         self.root.after(10, self.update_gui)
 
-    def update_pattern_form(self, *args):
-        pattern_type = self.pattern_type_var.get()
-        if pattern_type == 'Charuco':
-            self.populate_pattern_form(self.charuco_exclusive_params)
-        else:
-            self.populate_pattern_form(self.checker_exclusive_params)
-
     def populate_form_calib(self):
         pattern_type = self.pattern_type_var.get()
         if pattern_type == 'Charuco':
-            self.populate_form_with_params(self.common_calib_params+self.charuco_exclusive_params)
+            self.populate_form_with_params(self.common_calib_params + self.charuco_calib_exclusive)
         else:
             self.populate_form_with_params(self.common_calib_params + self.checker_exclusive_params)
 
@@ -402,123 +508,6 @@ class CalibrationApp:
                                                    video_frame=self.video_display_frame)
             self.current_thread = threading.Thread(target=self.calib_instance.generate)
             self.current_thread.start()
-
-    def load_entries_from_config(self):
-        config = configparser.ConfigParser()
-        if self.task_label.cget("text") == 'Generate Calibration Pattern':
-            config.read('settings-Pattern.ini')
-            if 'Parameters-Pattern' in config:
-                self.pattern_type_var.set(config['Parameters-Pattern'].get('Calibration Pattern Type', ''))
-                self.proj_repo_var.set(config['Parameters-Pattern'].get('Pattern Location (Where to save)', ))
-                self.rows_var.set(config['Parameters-Pattern'].get('Number of Rows (Y)', ''))
-                self.columns_var.set(config['Parameters-Pattern'].get('Number of Columns (X)', ''))
-                self.checker_width_var.set(config['Parameters-Pattern'].get('Square Size/Checker Width (mm)', ''))
-                self.margin_var.set(config['Parameters-Pattern'].get('Length of Side Margin (mm)', ''))
-                self.dpi_var.set(config['Parameters-Pattern'].get('Dots per Inch (dpi for printing)', ''))
-                self.dictionary_var.set(config['Parameters-Pattern'].get('Dictionary', '')),
-                self.marker_et_percentage_var.set(config['Parameters-Pattern'].get('Marker/Square Ratio', ''))
-
-        else:
-            if 'Parameters-Calib' in config:
-                config.read('settings-Calib.ini')
-                self.pattern_type_var.set(config['Parameters-Calib'].get('Calibration Pattern Type', ''))
-                self.dictionary_var.set(config['Parameters-Calib'].get('Dictionary', ''))
-                self.proj_repo_var.set(config['Parameters-Calib'].get('Project Repository', ''))
-                self.project_name_var.set(config['Parameters-Calib'].get('Project Name', ''))
-                self.single_video_file_var.set(config['Parameters-Calib'].get('Single Video Calib', ''))
-                self.video_files_var.set(config['Parameters-Calib'].get('Video Files', ''))
-                self.squaresX_var.set(config['Parameters-Calib'].get('SquareX', ''))
-                self.squaresY_var.set(config['Parameters-Calib'].get('SquareY', ''))
-                self.squareLength_var.set(config['Parameters-Calib'].get('SquareLength', ''))
-                self.markerLength_var.set(config['Parameters-Calib'].get('MarkerLength', ''))
-                self.frame_interval_calib_var.set(config['Parameters-Calib'].get('Frame Interval', ''))
-                self.save_every_n_frames_var.set(config['Parameters-Calib'].get('Save Every N Frames', ''))
-
-    def populate_pattern_form(self, exclusive_params, task='pattern'):
-        if task.lower() == 'pattern':
-            all_params = self.common_pattern_params + exclusive_params
-        elif task.lower() == 'calib':
-            all_params = self.common_calib_params + exclusive_params
-        else:
-            raise Exception
-        self.populate_form_with_params(all_params)
-
-    def create_dropdown(self, row, column, menu_attribute):
-        if hasattr(self, menu_attribute):
-            getattr(self, menu_attribute).grid_forget()
-            getattr(self, menu_attribute).grid(row=row, column=column)
-        else:
-            pass
-
-    def populate_form_with_params(self, params):
-        if not hasattr(self, 'task_label'):
-            self.task_label = tk.Label(self.input_frame, text="", font=("Verdana", 18, 'bold'), bg='#ADD8E6',
-                                       fg='#000000')
-
-        for widget in self.input_frame.winfo_children():
-            widget.grid_forget()
-
-        # Then repopulate
-        self.task_label.grid(row=0, column=0, columnspan=3, pady=20, sticky="ew")
-        n_rows = len(params)
-
-        for i, (text, var, cmd, _) in enumerate(params):
-            if not hasattr(self, 'label_style'):
-                self.label_style = {'bg': '#ADD8E6', 'fg': '#000000', 'font': ('Courier New', 12)}
-            label = tk.Label(self.input_frame, text=text, **self.label_style)
-            label.grid(row=i + 1, column=0, sticky="w")
-
-            if text == 'Dictionary:':
-                cmd(i + 1, 1, 'dictionary_menu')
-            elif text == "Display Video During Calibration?:":
-                cmd(i + 1, 1, 'display_video_menu')
-            elif text == 'Calibration Pattern Type:':
-                cmd(i + 1, 1, 'pattern_type_menu')
-
-            else:
-
-                entry = ttk.Entry(self.input_frame, textvariable=var, width=40)
-                entry.grid(row=i + 1, column=1)
-
-                if cmd:
-                    ttk.Button(self.input_frame, text="Browse", command=cmd).grid(row=i + 1, column=2)
-
-        self.start_task_button.grid(row=n_rows + 1, column=1, padx=5, pady=5)
-
-        ttk.Button(self.input_frame, text="Back", command=lambda: self.show_frame(self.start_frame)).grid(
-            row=n_rows + 2, column=1, padx=5, pady=5)
-
-    def populate_form_based_on_task(self, task):
-        params_copy = [list(p) for p in self.params]
-
-        if task == "Calibrate Only":
-            for i, param in enumerate(params_copy):
-                if param[0] == "Video Files (for correction):":
-                    param[0] = "Video Files (for calibration):"
-            self.populate_form_with_params(params_copy)
-
-        elif task == "Correct Only":
-            self.populate_form_with_params(params_copy[:7])  # Assuming first 7 are necessary
-
-        elif task == "Self-Calibrate & Correct":
-            self.populate_form_with_params(params_copy)
-
-        elif task == "Single Calib and Multiple Video Correction":
-            params_copy.append(["Single Video File:", self.single_video_file_var, self.browse_single_video_file, None])
-            pattern_type = self.pattern_type_var.get()
-            # if pattern_type == 'Charuco':
-            #     self.populate_pattern_form(self.charuco_exclusive_params)
-            # else:
-            #     self.populate_pattern_form(self.checker_exclusive_params)
-            self.populate_form_with_params(params_copy)
-            self.shift_down_widgets(start_row=4, shift_amount=1)
-
-        elif task == "Generate Calibration Pattern":
-            pattern_type = self.pattern_type_var.get()
-            if pattern_type == 'Charuco':
-                self.populate_pattern_form(self.charuco_exclusive_params)
-            else:
-                self.populate_pattern_form(self.checker_exclusive_params)
 
     def on_self_calibrate_correct_click(self):
         self.show_frame(self.status_frame, "Self-Calibrate & Correct")
@@ -656,6 +645,37 @@ class CalibrationApp:
         self.copyright_label.pack(side=tk.BOTTOM, anchor='s')
         self.copyright_label.bind("<Button-1>", open_web_page)
 
+    def load_entries_from_config(self):
+        config = configparser.ConfigParser()
+        if self.task_label.cget("text") == 'Generate Calibration Pattern':
+            config.read('settings-Pattern.ini')
+            if 'Parameters-Pattern' in config:
+                self.pattern_type_var.set(config['Parameters-Pattern'].get('Calibration Pattern Type', ''))
+                self.proj_repo_var.set(config['Parameters-Pattern'].get('Pattern Location (Where to save)', ))
+                self.rows_var.set(config['Parameters-Pattern'].get('Number of Rows (Y)', ''))
+                self.columns_var.set(config['Parameters-Pattern'].get('Number of Columns (X)', ''))
+                self.checker_width_var.set(config['Parameters-Pattern'].get('Square Size/Checker Width (mm)', ''))
+                self.margin_var.set(config['Parameters-Pattern'].get('Length of Side Margin (mm)', ''))
+                self.dpi_var.set(config['Parameters-Pattern'].get('Dots per Inch (dpi for printing)', ''))
+                self.dictionary_var.set(config['Parameters-Pattern'].get('Dictionary', '')),
+                self.marker_et_percentage_var.set(config['Parameters-Pattern'].get('Marker/Square Ratio', ''))
+
+        else:
+            if 'Parameters-Calib' in config:
+                config.read('settings-Calib.ini')
+                self.pattern_type_var.set(config['Parameters-Calib'].get('Calibration Pattern Type', ''))
+                self.dictionary_var.set(config['Parameters-Calib'].get('Dictionary', ''))
+                self.proj_repo_var.set(config['Parameters-Calib'].get('Project Repository', ''))
+                self.project_name_var.set(config['Parameters-Calib'].get('Project Name', ''))
+                self.single_video_file_var.set(config['Parameters-Calib'].get('Single Video Calib', ''))
+                self.video_files_var.set(config['Parameters-Calib'].get('Video Files', ''))
+                self.squaresX_var.set(config['Parameters-Calib'].get('SquareX', ''))
+                self.squaresY_var.set(config['Parameters-Calib'].get('SquareY', ''))
+                self.squareLength_var.set(config['Parameters-Calib'].get('SquareLength', ''))
+                self.markerLength_var.set(config['Parameters-Calib'].get('MarkerLength', ''))
+                self.frame_interval_calib_var.set(config['Parameters-Calib'].get('Frame Interval', ''))
+                self.save_every_n_frames_var.set(config['Parameters-Calib'].get('Save Every N Frames', ''))
+
     def go_back(self):
 
         self.calib_instance.stop()
@@ -688,6 +708,12 @@ class CalibrationApp:
     def browse_proj_repo(self):
         folder_selected = filedialog.askdirectory()
         self.proj_repo_var.set(folder_selected)
+    def create_dropdown(self, row, column, menu_attribute):
+        if hasattr(self, menu_attribute):
+            getattr(self, menu_attribute).grid_forget()
+            getattr(self, menu_attribute).grid(row=row, column=column)
+        else:
+            pass
 
     def browse_video_files(self):
         files_selected = filedialog.askopenfilenames(
