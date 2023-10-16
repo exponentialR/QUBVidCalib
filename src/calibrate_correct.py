@@ -73,7 +73,7 @@ class CalibrateCorrect:
                                                 self.aruco_dict)
         else:
             pass
-        self.min_corners = 10
+        self.min_corners = 1 #10
         self.calibration_params = None  # To store calibration parameters
         self.current_progress = 0  # To store the current progress percentage
         self.video_frame = video_frame
@@ -127,33 +127,32 @@ class CalibrateCorrect:
                 break
             if frame_count % self.frame_interval_calib == 0:
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                if self.pattern_type.lower == 'checker':
+                if self.pattern_type.lower() == 'checker':
                     ret, corners = cv2.findChessboardCorners(gray, self.pattern_size, None)
-                    if len(corners) > 0:
-                        debug_frame = cv2.drawChessboardCorners(frame.copy(), self.pattern_size, corners, ret)
-                        if self.status_queue and not animation_started:
-                            self.status_queue.put(("Collecting Corners Calibration", "anime"))
-                            animation_started = True
-                        if self.display == 'Yes':
-                            debug_frame_ = cv2.resize(debug_frame, (440, 360))
-                            self.video_frame.img = ImageTk.PhotoImage(
-                                image=Image.fromarray(cv2.cvtColor(debug_frame_, cv2.COLOR_BGR2RGB)))
-                            self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
+                    debug_frame = cv2.drawChessboardCorners(frame.copy(), self.pattern_size, corners, ret)
+                    if self.status_queue and not animation_started:
+                        self.status_queue.put(("Collecting Corners Calibration", "anime"))
+                        animation_started = True
+                    if self.display == 'Yes':
+                        debug_frame_ = cv2.resize(debug_frame, (440, 360))
+                        self.video_frame.img = ImageTk.PhotoImage(
+                            image=Image.fromarray(cv2.cvtColor(debug_frame_, cv2.COLOR_BGR2RGB)))
+                        self.video_frame.create_image(0, 0, image=self.video_frame.img, anchor=NW)
 
-                        if not ret or len(corners) <= self.min_corners:
-                            self.status_queue.put(
-                                (f'Frame {frame_count} - Not enough corners for interpolation', 'DEBUG'))
-                            rejected_frame_filename = os.path.join(rejected_folder, f'{video_name}_{frame_count}.png')
-                            cv2.imwrite(rejected_frame_filename, debug_frame)
-                            if animation_started:
-                                self.status_queue.put(('Collecting Corners for Calibration', 'anime'))
-                        else:
-                            obj_points.append(self._generate_objp())
-                            img_points.append(corners)
-                            if self.save_calib_frames is not None and frame_count % self.save_calib_frames == 0:
-                                frame_filename = os.path.join(self.calib_frames, video_name,
-                                                              f'{video_name}_{frame_count}.png')
-                                cv2.imwrite(frame_filename, debug_frame)
+                    if not ret: #or len(corners) <= self.min_corners:
+                        self.status_queue.put(
+                            (f'Frame {frame_count} - Not enough corners for interpolation', 'DEBUG'))
+                        rejected_frame_filename = os.path.join(rejected_folder, f'{video_name}_{frame_count}.png')
+                        cv2.imwrite(rejected_frame_filename, debug_frame)
+                        if animation_started:
+                            self.status_queue.put(('Collecting Corners for Calibration', 'anime'))
+                    else:
+                        obj_points.append(self._generate_objp())
+                        img_points.append(corners)
+                        if self.save_calib_frames is not None and frame_count % self.save_calib_frames == 0:
+                            frame_filename = os.path.join(self.calib_frames, video_name,
+                                                          f'{video_name}_{frame_count}.png')
+                            cv2.imwrite(frame_filename, debug_frame)
 
                 elif self.pattern_type.lower() == 'charuco':
                     corners, ids, _ = cv2.aruco.detectMarkers(gray, self.aruco_dict)
@@ -192,26 +191,31 @@ class CalibrateCorrect:
                             self.status_queue.put(("Collecting Corners and IDs for Calibration", "anime"))
 
             frame_count += 1
+        save_path = f'{self.param_folder}/calibration_{os.path.basename(single_video_calib)}.npz'
+        if self.pattern_type.lower() == 'charuco':
+            if len(all_charuco_corners) > 0 and len(all_charuco_ids) > 0:
+                # Status to show computing extrinsic and intrinsic parameters
+                self.status_queue.put(('COMPUTING EXTRINSIC AND INTRINSIC PARAMETERS', "anime"))
 
-        if len(all_charuco_corners) > 0 and len(all_charuco_ids) > 0:
-            # Status to show computing extrinsic and intrinsic parameters
-            self.status_queue.put(('COMPUTING EXTRINSIC AND INTRINSIC PARAMETERS', "anime"))
-            if self.pattern_type.lower() == 'charuco':
                 ret, mtx, dist, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(
-                    all_charuco_corners, all_charuco_ids, self.board, gray.shape[::-1], None, None)
+                        all_charuco_corners, all_charuco_ids, self.board, gray.shape[::-1], None, None)
+                np.savez(save_path, mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
 
             else:
-                ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-                    [self._generate_objp()] * len(img_points), img_points, gray[::-1], None, None)
+                self.status_queue.put(('NOT ENOUGH CORNERS FOR CALIBRATION. EXITING...', 'ERROR'))
 
-            save_path = f'{self.param_folder}/calibration_{os.path.basename(single_video_calib)}.npz'
+        else:
+            if len(img_points) ==0 or len(obj_points) == 0:
+                print('Insufficient data for Calibration')
+                return
+            self.status_queue.put(('COMPUTING EXTRINSIC AND INTRINSIC PARAMETERS', "anime"))
+            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera([self._generate_objp()] * len(img_points), img_points, gray.shape[::-1], None, None)
 
             np.savez(save_path, mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
-            if self.status_queue:
-                self.status_queue.put(('', "-"))
-
-            cap.release()
-            return save_path
+        if self.status_queue:
+            self.status_queue.put(('', "-"))
+        cap.release()
+        return save_path
 
     def add_controls(self, control_frame):
         # Add Play Button
