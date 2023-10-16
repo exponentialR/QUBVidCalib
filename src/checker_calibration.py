@@ -1,53 +1,61 @@
-import cv2
 import numpy as np
+import cv2
+import glob
+import yaml
+#import pathlib
 
+# termination criteria
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+# prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+objp = np.zeros((7*7,3), np.float32)
+objp[:,:2] = np.mgrid[0:7,0:7].T.reshape(-1,2)
+# Arrays to store object points and image points from all the images.
+objpoints = [] # 3d point in real world space
+imgpoints = [] # 2d points in image plane.
 
-def calibrate_camera_from_video(video_source=0, checkerboard=(15, 15)):
-    # Initialize video capture
-    cap = cv2.VideoCapture(video_source)
+images = glob.glob(r'C:\Users\sadebayo\Documents\Blog\Test-image/*.jpeg')
+print(images)
+# path = 'results'
+# pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-    # Initialize criteria and points storage
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    objpoints = []
-    imgpoints = []
+found = 0
+for fname in images:  # Here, 10 can be changed to whatever number you like to choose
+    img = cv2.imread(fname) # Capture frame-by-frame
+    #print(images[im_i])
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Find the chess board corners
+    ret, corners = cv2.findChessboardCorners(gray, (8,5), None)
+    print(corners)
+    # If found, add object points, image points (after refining them)
+    if ret == True:
+        objpoints.append(objp)   # Certainly, every loop objp is the same, in 3D.
+        corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+        imgpoints.append(corners2)
+        # Draw and display the corners
+        img = cv2.drawChessboardCorners(img, (8, 5), corners2, ret)
+        found += 1
+        cv2.imshow('img', img)
+        cv2.waitKey(500)
+        # if you want to save images with detected corners
+        # uncomment following 2 lines and lines 5, 18 and 19
+        # image_name = path + '/calibresult' + str(found) + '.png'
+        # cv2.imwrite(image_name, img)
 
-    # Initialize world coordinates for 3D points
-    objp = np.zeros((1, checkerboard[0] * checkerboard[1], 3), np.float32)
-    objp[0, :, :2] = np.mgrid[0:checkerboard[0], 0:checkerboard[1]].T.reshape(-1, 2)
+print("Number of images used for calibration: ", found)
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Failed to capture image")
-            break
+# When everything done, release the capture
+# cap.release()
+# cv2.destroyAllWindows()
+#
+# # calibration
+# ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+#
+# # transform the matrix and distortion coefficients to writable lists
+# data = {'camera_matrix': np.asarray(mtx).tolist(),
+#         'dist_coeff': np.asarray(dist).tolist()}
+#
+# # and save it to a file
+# with open("calibration_matrix.yaml", "w") as f:
+#     yaml.dump(data, f)
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        ret, corners = cv2.findChessboardCorners(gray, checkerboard,
-                                                 cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE)
-
-        if ret:
-            objpoints.append(objp)
-            corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-            imgpoints.append(corners2)
-            frame = cv2.drawChessboardCorners(frame, checkerboard, corners2, ret)
-
-        cv2.imshow('Calibration', frame)
-
-        # Press 'q' to exit the loop and proceed to calibration
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-    # Perform calibration
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
-
-    print("Camera matrix : \n", mtx)
-    print("Distortion coefficients : \n", dist)
-    print("Rotation Vectors : \n", rvecs)
-    print("Translation Vectors : \n", tvecs)
-
-
-# Example usage
-calibrate_camera_from_video(video_source=, checkerboard=(15, 15))
+# done
