@@ -205,8 +205,6 @@ class CalibrateCorrect:
                                                                                 self.board, gray.shape[::-1], None,
                                                                                 None)
 
-                # ret, mtx, dist, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(
-                #         all_charuco_corners, all_charuco_ids, self.board, gray.shape[::-1], None, None)
                 np.savez(save_path, mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
 
             else:
