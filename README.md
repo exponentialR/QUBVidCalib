@@ -1,7 +1,9 @@
 # CalibraVision - Camera Calibration Toolbox
 ![CameraCalibration-tool.png](assets/CameraCalibration-tool.png)
 
-Read about Calibration [here](https://samueladebayo.com/camera-calibration-part-1)## Table of Contents
+Read about Calibration [here](https://samueladebayo.com/camera-calibration-part-1)
+
+
 [Introduction](#introduction) &nbsp; | &nbsp; [Features](#features) &nbsp; | &nbsp; [Experimental Features](#experimental-features) &nbsp; | &nbsp; [Prerequisites](#prerequisites) &nbsp; | &nbsp; [Installation](#installation) &nbsp; | &nbsp; [Usage](#usage) &nbsp; | &nbsp; [Loading Configuration](#loading-configuration) &nbsp; | &nbsp; [Starting Calibration or Correction](#starting-calibration-or-correction) &nbsp; | &nbsp; [Screenshots](#screenshots) &nbsp; | &nbsp; [Video Guide](#video-guide) &nbsp; | &nbsp; [Development Status](#development-status) &nbsp; | &nbsp; [Contributing](#contributing) &nbsp; | &nbsp; [License](#license) &nbsp; | &nbsp; [Acknowledgements](#acknowledgements)
 
 
