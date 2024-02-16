@@ -1,45 +1,31 @@
-# Camera Calibration Toolbox
+# CalibraVision - Camera Calibration Toolbox
 ![CameraCalibration-tool.png](assets/CameraCalibration-tool.png)
 
-Read about Calibration [here](https://samueladebayo.com/camera-calibration-part-1)
-## Table of Contents
+Read about Calibration [here](https://samueladebayo.com/camera-calibration-part-1)## Table of Contents
+[Introduction](#introduction) &nbsp; | &nbsp; [Features](#features) &nbsp; | &nbsp; [Experimental Features](#experimental-features) &nbsp; | &nbsp; [Prerequisites](#prerequisites) &nbsp; | &nbsp; [Installation](#installation) &nbsp; | &nbsp; [Usage](#usage) &nbsp; | &nbsp; [Loading Configuration](#loading-configuration) &nbsp; | &nbsp; [Starting Calibration or Correction](#starting-calibration-or-correction) &nbsp; | &nbsp; [Screenshots](#screenshots) &nbsp; | &nbsp; [Video Guide](#video-guide) &nbsp; | &nbsp; [Development Status](#development-status) &nbsp; | &nbsp; [Contributing](#contributing) &nbsp; | &nbsp; [License](#license) &nbsp; | &nbsp; [Acknowledgements](#acknowledgements)
 
-- [Introduction](#introduction)
-- [Features](#features)
-  - [Experimental Features](#experimental-features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Loading Configuration](#loading-configuration)
-  - [Starting Calibration or Correction](#starting-calibration-or-correction)
-- [Screenshots](#screenshots)
-- [Video Guide](#video-guide)
-- [Development Status](#development-status)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
 
 ## Introduction
 
-The Calibration and Correction GUI is a Python-based application aimed to facilitate video calibration and correction tasks. Leveraging OpenCV for video processing and Tkinter for the graphical interface, this application is designed with academic and industrial research in mind.
-
+The CalibraVision offers a sophisticated yet user-friendly toolkit for camera calibration and video correction, integrating advanced pattern recognition and calibration techniques to enhance the accuracy and efficiency of the calibration process.
 ## Features
 
-- Automated video calibration using Charuco boards
-- Real-time display of corrected and uncorrected video streams
-- Ability to save calibration parameters for future use
-- Easy-to-use graphical interface with intuitive controls
-- Option to load custom calibration files
-- Extensive logging to monitor calibration and correction processes
-- Frame interval and frame save settings for enhanced control
+> **Dynamic Pattern Generation**: Support for Charuco and Checker patterns, customizable according to user needs.
 
-### Experimental Features
+> **Enhanced Calibration Options**: Including 'Calibrate Only', 'Self-Calibrate & Correct', 'Correct Only', and 'Single Calib and Multiple Video Correction'.
 
-- Play/Pause controls for video review (In Development)
-- Slider for video navigation (In Development)
+> **Real-time display** of corrected and uncorrected video streams
+
+> Ability to **save calibration parameters** for future use
+
+> Easy-to-use graphical interface with **intuitive controls**
+
+> Option to load **custom calibration files**
+
+> Extensive **logging** to monitor calibration and correction processes
 
 ## Prerequisites
-
+To be installed using requirements.txt
 - Python 3.x
 - Tkinter
 - OpenCV
@@ -51,12 +37,34 @@ The Calibration and Correction GUI is a Python-based application aimed to facili
 1. Clone the repository:
    ```bash
    git clone https://github.com/exponentialR/QUBVidCalib.git
+2. Navigate to the project directory:
+    ````bash
+   cd QUBVidCalib
+   
+3. Create a Python environment and install dependencies:
 
-2. Install the required packages:
-    ```bash
+- On Linux:
+
+    ````bash 
+   python3 -m venv calibra
+   source calibra/bin/activate
    pip install -r requirements.txt
+  
+   
+- On Windows:
+    ````bash 
+  python -m venv calibra
+  .\calibra\Scripts\activate
+  pip install -r requirements.txt
 
-3. Starting the app
+- On Mac:
+    ````bash
+  python3 -m venv calibra
+  source calibra/bin/activate
+  pip install -r requirements.txt
+
+
+4. Starting the app
    ```bash 
    cd src 
    python3 main.py
@@ -66,13 +74,14 @@ The Calibration and Correction GUI is a Python-based application aimed to facili
 Loading Configuration
 On application start, the GUI loads existing configurations from settings.ini if available. Users have the option to manually set the following parameters:
 
-- Project Repository 
-- Project Name 
-- Video Files 
-- Calibration Board Dimensions 
-- Frame Interval  
-- Number of Frames to Save 
-- Dictionary Type 
+* **Calibration Type**: Chaurco or Checkerboard
+* **Project Repository**: Set the directory for saving project files.
+* **Project Name**: Assign a unique name for the calibration session.
+* **Video Files**: Specify the target videos for calibration or correction.
+* **Calibration Board Dimensions**: Input the dimensions of the used calibration board.
+* **Frame Interval**: Determine the frame capture rate for calibration.
+* **Number of Frames to Save**: Set how many frames are saved during calibration.
+* **Dictionary Type**: if using charuco, Choose the marker dictionary type for pattern detection.
 
 ### Starting Calibration or Correction
 The main window offers three options:
@@ -82,9 +91,17 @@ The main window offers three options:
 3. **Calibrate and Correct**: Perform both calibration and correction.
 Once started, the application provides real-time logging and status updates. The corrected video and calibration parameters can be saved for future use.
 
+### Calibration Pattern Generation
+An additional feature, "Generate Calibration Pattern," is now available for creating custom calibration patterns. Users can define the pattern type, dimensions, and other parameters for printing, and recommended paper size will be atop the pattern.
+
+### Experimental Features
+
+- Play/Pause controls for video review (In Development)
+- Slider for video navigation (In Development)
+
 ## Development Status
-- Play/Pause controls: Still under development.
-- Slider: Still under development.
+- Chessboard Pattern: Integration for Chessboard calibration patterns is now complete and available.
+- Pattern Generation: Users can generate custom calibration patterns directly within the application.
 
 ## Contributing
 Feel free to fork this repository and submit a pull request if you have some features or fixes to contribute. For more information, please read the CONTRIBUTING.md guide.
@@ -94,6 +111,5 @@ This project is licensed under the MIT License - see the [LICENSE.md](./LICENSE.
 
 
 ## TODO 
-> Update for Chess board use
+> Enhancements to the embedded Video Player for a richer user experience.
 
-> Work on the Video Player
