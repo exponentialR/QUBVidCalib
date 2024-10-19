@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13956034.svg)](https://doi.org/10.5281/zenodo.13956034)
+
 # CalibraVision - Camera Calibration Toolbox
 ![CameraCalibration-tool.png](assets/CameraCalibration-tool.png)
 
@@ -115,3 +117,19 @@ This project is licensed under the MIT License - see the [LICENSE.md](./LICENSE.
 ## TODO 
 > Enhancements to the embedded Video Player for a richer user experience.
 
+## Citation
+If you find this project useful, please consider citing it using the following BibTeX entry:
+```bibtex
+
+@misc{adebayo_exponentialrqubvidcalib_2024,
+	title = {{exponentialR}/{QUBVidCalib}: {V1}.0},
+	shorttitle = {{exponentialR}/{QUBVidCalib}},
+	url = {https://zenodo.org/records/13956034},
+	abstract = {publication release},
+	urldate = {2024-10-19},
+	publisher = {Zenodo},
+	author = {Adebayo, Samuel},
+	month = oct,
+	year = {2024},
+	doi = {10.5281/zenodo.13956034},
+}
